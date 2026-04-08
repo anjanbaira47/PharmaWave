@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Pharma Wave</title>
+    <link rel="stylesheet" href="style1.css">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="config.js"></script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCxFspLccHlPDbmMCgZkI5VQPEg0IK4xfk",
+            authDomain: "pro-pharma-wave.firebaseapp.com",
+            projectId: "pro-pharma-wave",
+            storageBucket: "pro-pharma-wave.firebasestorage.app",
+            messagingSenderId: "528351606474",
+            appId: "1:528351606474:web:e6cde01d2545aa7b236633"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        function showToast(message, type = "success") {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = "show " + type;
+            setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+        window.handleFirebaseGoogleLogin = async function () {
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+
+                // Store in localStorage — role defaults to 'user' for Google sign-ins
+                localStorage.setItem('pharmaUser', JSON.stringify({
+                    userId: user.uid,
+                    username: user.displayName || user.email.split('@')[0],
+                    profile_pic: user.photoURL,
+                    email: user.email,
+                    role: 'user',
+                    token: await user.getIdToken()
+                }));
+
+                showToast("Google Login Successful! Redirecting...", "success");
+                setTimeout(() => { window.location.href = "Front.html"; }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                showToast("Google Sign-In failed: " + (err.message || "Unknown error"), "error");
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <a href="Front.html" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="40" height="40" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    style="overflow: visible; filter: drop-shadow(0 4px 6px rgba(16,185,129,0.3));">
+                    <defs>
+                        <linearGradient id="pw-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="100%" stop-color="#34d399" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 25 85 L 25 25 A 20 20 0 0 1 25 65" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 60 45 L 80 85 L 100 45 L 120 85 L 145 15" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 115 15 L 145 15 L 145 45" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                PharmaWave
+            </a>
+        </div>
+        <div class="navigation">
+            <ul>
+                <li><a href="Front.html#catalog">Medicines</a></li>
+                <li><a href="#">Locations</a></li>
+                <li><a href="#">24/7 Support</a></li>
+                <li><a href="DirectLogin.html" class="nav-btn login" id="authBtn">Login</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast"></div>
+
+    <div class="auth-page">
+        <div class="form-box">
+            <div class="auth-header">
+                <h2>Welcome <span class="animated-gradient-text">Back</span></h2>
+                <h3>Login to your account to continue</h3>
+            </div>
+
+            <div class="input-box">
+                <input type="email" id="emailInput" class="input-field" placeholder="Google Email Address">
+            </div>
+            <div class="input-box">
+                <input type="password" id="password" class="input-field" placeholder="Password">
+            </div>
+
+            <button class="submit-btn" id="loginBtn">Login securely</button>
+
+            <div class="divider" style="text-align: center; margin: 20px 0; position: relative;">
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                <span
+                    style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #f8fafc; padding: 0 10px; color: var(--text-muted); font-size: 14px;">OR</span>
+            </div>
+
+            <button onclick="handleFirebaseGoogleLogin()" style="width:100%; padding:14px; background:white; border:1px solid #dadce0; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:15px; font-weight:600; color:#3c4043; cursor:pointer; transition:box-shadow 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.boxShadow='none'">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
+                Sign in with Google
+            </button>
+
+            <div class="auth-links">
+                <a href="ForgotPassword.html">Forgot Password?</a>
+                <a href="UserSignup.html">Don't have an account? <strong>Sign up here</strong></a>
+            </div>
+
+            <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px dashed rgba(0,0,0,0.1);">
+                <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 600;">
+                    Are you a delivery agent? 
+                    <a href="AgentLogin.html" style="color: #f59e0b; text-decoration: underline; margin-left: 5px;">Agent Login</a>
+                </p>
+            </div>
+
+
+        </div>
+    </div>
+
+    <!-- Login Script -->
+    <script>
+        const toast = document.getElementById("toast");
+        const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
+
+        function showToast(message, type = "success") {
+            toast.textContent = message;
+            toast.className = "show " + type;
+            setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+
+        const loginBtn = document.getElementById("loginBtn");
+        const emailInput = document.getElementById("emailInput");
+        const passwordInput = document.getElementById("password");
+
+        // Allow pressing Enter to login
+        const handleEnterKey = (e) => {
+            if (e.key === 'Enter') {
+                loginBtn.click();
+            }
+        };
+        emailInput.addEventListener('keypress', handleEnterKey);
+        passwordInput.addEventListener('keypress', handleEnterKey);
+
+        loginBtn.addEventListener("click", async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            if (!email || !password) {
+                showToast("Please enter both email and password", "error");
+                return;
+            }
+
+            // Validation: Google Mail, pharmawave.com, citymedical.com, Mobile, or 'admin'
+            const emailLower = email.toLowerCase();
+            const isGmail = emailLower.endsWith('@gmail.com');
+            const isPharma = emailLower.endsWith('@pharmawave.com');
+            const isPartner = emailLower.endsWith('@citymedical.com');
+            const isMobile = /^[6-9]\d{9}$/.test(email);
+            const isAdmin = emailLower === 'admin';
+
+            if (!isGmail && !isPharma && !isPartner && !isMobile && !isAdmin) {
+                showToast("Please enter a valid Google Mail (@gmail.com), Mobile Number, or Authorized ID.", "error");
+                return;
+            }
+
+            loginBtn.textContent = 'Authenticating...';
+            loginBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Save user info and JWT token in localStorage for the cart and header
+                    localStorage.setItem('pharmaUser', JSON.stringify({
+                        userId: data.userId,
+                        username: data.username,
+                        profile_pic: data.profile_pic,
+                        role: data.role,
+                        token: data.token
+                    }));
+
+                    showToast("Login Successful! Redirecting...", "success");
+                    loginBtn.style.background = "var(--primary)";
+                    loginBtn.textContent = 'Success!';
+
+                    setTimeout(() => {
+                        let destination = "Front.html";
+                        if (data.role === 'admin') destination = "AdminDashboard.html";
+                        else if (data.role === 'delivery') destination = "DeliveryDashboard.html";
+                        else if (data.role === 'pharmacy') destination = "PharmacyDashboard.html";
+                        
+                        window.location.href = destination;
+                    }, 2000);
+                } else {
+                    showToast(data.message || "Invalid credentials. Please try again.", "error");
+                    loginBtn.textContent = 'Login securely';
+                    loginBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Server connection error. Please try again later.", "error");
+                loginBtn.textContent = 'Login securely';
+                loginBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,10 @@
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+Connected to MySQL pool
+Server running on port 3000
+Database tables initialized successfully.
+
+=========================================
+PASSWORD RESET REQUEST (Mock Email)
+Your 6-digit OTP Code: 154951
+=========================================
+

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaWave | Pharmacy Portal</title>
+    <link rel="stylesheet" href="style1.css">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="config.js"></script>
+    <style>
+        body {
+            background: #f8fafc;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .admin-layout {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR (Themed slightly different from Admin for distinction) */
+        .admin-sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%);
+            color: white;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .admin-logo {
+            font-size: 24px;
+            font-weight: 900;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 40px;
+            padding-left: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .admin-logo ion-icon {
+            color: #60a5fa;
+        }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #93c5fd;
+            transition: all 0.2s;
+        }
+
+        .admin-nav-item:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .admin-nav-item.active {
+            background: rgba(96, 165, 250, 0.15);
+            color: #60a5fa;
+            box-shadow: inset 4px 0 0 #60a5fa;
+        }
+
+        /* MAIN CONTENT */
+        .admin-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .admin-title {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 900;
+            color: #0f172a;
+            letter-spacing: -1px;
+        }
+
+        /* TAB PANELS */
+        .admin-panel {
+            display: none;
+        }
+
+        .admin-panel.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* DATA TABLES */
+        .data-table-container {
+            background: white;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 16px 24px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        td {
+            padding: 16px 24px;
+            font-size: 15px;
+            color: #334155;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 500;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: #f1f5f9;
+        }
+
+        /* BUTTONS */
+        .add-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        select.status-dropdown {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toast"></div>
+
+    <div class="admin-layout">
+        <div class="admin-sidebar">
+            <div class="admin-logo">
+                <ion-icon name="medkit"></ion-icon> Pharmacy Portal
+            </div>
+
+            <div class="admin-nav-item active" onclick="switchAdminTab('orders', this)">
+                <ion-icon name="cart"></ion-icon> Incoming Orders
+            </div>
+            <div class="admin-nav-item" onclick="switchAdminTab('prescriptions', this)">
+                <ion-icon name="document-text"></ion-icon> Prescriptions
+            </div>
+            <div class="admin-nav-item" onclick="switchAdminTab('inventory', this)">
+                <ion-icon name="cube"></ion-icon> My Inventory
+            </div>
+            <div style="flex: 1;"></div>
+            <div class="admin-nav-item" onclick="window.location.href='Front.html'"
+                style="color: #ef4444; margin-top: auto;">
+                <ion-icon name="log-out"></ion-icon> Exit Portal
+            </div>
+        </div>
+
+        <div class="admin-content">
+
+            <!-- ORDERS TAB -->
+            <div id="tab-orders" class="admin-panel active">
+                <div class="admin-header">
+                    <h1 class="admin-title">Incoming Orders</h1>
+                    <p style="color: #64748b; font-weight: 600;">Manage prep and handoff phases.</p>
+                </div>
+
+                <div class="data-table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Total</th>
+                                <th>Schedule</th>
+                                <th>Current Status</th>
+                                <th>Update Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center;">Loading orders...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PRESCRIPTIONS TAB -->
+            <div id="tab-prescriptions" class="admin-panel">
+                <div class="admin-header">
+                    <h1 class="admin-title">Prescription Verification</h1>
+                    <p style="color: #64748b; font-weight: 600;">Review uploaded files from patients.</p>
+                </div>
+                <div class="data-table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Customer</th>
+                                <th>Image</th>
+                                <th>Current Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="prescriptionsTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center;">Loading prescriptions...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- INVENTORY TAB -->
+            <div id="tab-inventory" class="admin-panel">
+                <div class="admin-header">
+                    <h1 class="admin-title">Medicine Inventory</h1>
+                    <button class="add-btn"><ion-icon name="add"></ion-icon> Add New Medicine</button>
+                </div>
+                <div class="data-table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Meds Name</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center;">Loading inventory...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Image Modal for Prescriptions -->
+    <div id="imageModal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index: 1000; align-items:center; justify-content:center; flex-direction:column;">
+        <img id="modalImg" src="" style="max-width:90%; max-height:80vh; border-radius:12px; margin-bottom:20px;">
+        <button onclick="document.getElementById('imageModal').style.display='none'"
+            style="background:white; color:black; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">Close</button>
+    </div>
+
+    <script>
+        const toast = document.getElementById("toast");
+        const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
+
+        function showToast(message, type = "success") {
+            toast.textContent = message; toast.className = "show " + type;
+            setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+        function switchAdminTab(tabId, el) {
+            document.querySelectorAll('.admin-panel').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.admin-nav-item').forEach(m => m.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            el.classList.add('active');
+
+            if (tabId === 'orders') loadOrders();
+            if (tabId === 'prescriptions') loadPrescriptions();
+            if (tabId === 'inventory') loadInventory();
+        }
+
+        function viewImage(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('imageModal').style.display = 'flex';
+        }
+
+        // LOADERS
+        function getAuthHeaders() {
+            const user = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+            return {
+                'Authorization': `Bearer ${user.token || ''}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function loadOrders() {
+            const tbody = document.getElementById('ordersTableBody');
+            try {
+                const res = await fetch(`${API_BASE}/api/pharmacy/orders`, { headers: getAuthHeaders() });
+                if (res.status === 401 || res.status === 403) {
+                    window.location.href = "DirectLogin.html";
+                    return;
+                }
+                const data = await res.json();
+                if (data.success && data.orders.length > 0) {
+                    tbody.innerHTML = '';
+                    data.orders.forEach(o => {
+                        let badgeColor = o.status === 'Pending' ? '#ef4444' : (o.status === 'Preparing' ? '#f59e0b' : '#10b981');
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>#${o.id}</td>
+                                <td style="font-weight: 700;">${o.customer_name || 'Guest'}</td>
+                                <td>₹${Number(o.total_amount).toFixed(2)}</td>
+                                <td style="text-transform: capitalize;">${o.schedule}</td>
+                                <td><span class="badge" style="background:${badgeColor}20; color:${badgeColor};">${o.status}</span></td>
+                                <td>
+                                    <select class="status-dropdown" onchange="updateOrderStatus(${o.id}, this)">
+                                        <option value="" disabled selected>Change Status</option>
+                                        <option value="Preparing">Mark as Preparing</option>
+                                        <option value="Ready for Delivery">Mark as Ready</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No massive orders right now.</td></tr>';
+                }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="6">Error loading...</td></tr>'; }
+        }
+
+        async function updateOrderStatus(id, selectEl) {
+            const status = selectEl.value;
+            if (!status) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/pharmacy/orders/${id}/status`, {
+                    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ status })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast("Order status updated!");
+                    loadOrders(); // refresh
+                } else { showToast(data.message, "error"); }
+            } catch (e) { showToast("Error updating status", "error"); }
+        }
+
+        async function loadPrescriptions() {
+            const tbody = document.getElementById('prescriptionsTableBody');
+            try {
+                const res = await fetch(`${API_BASE}/api/pharmacy/prescriptions`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success && data.prescriptions.length > 0) {
+                    tbody.innerHTML = '';
+                    data.prescriptions.forEach(p => {
+                        let badgeColor = p.status === 'Pending Review' ? '#f59e0b' : (p.status === 'Approved' ? '#10b981' : '#ef4444');
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>#${p.id}</td>
+                                <td style="font-weight: 700;">${p.customer_name || 'Guest'}</td>
+                                <td>
+                                    <div style="width:50px; height:50px; background:#e2e8f0; border-radius:8px; cursor:pointer; overflow:hidden;" onclick="viewImage('${p.image_data}')">
+                                        <img src="${p.image_data}" style="width:100%; height:100%; object-fit:cover;">
+                                    </div>
+                                </td>
+                                <td><span class="badge" style="background:${badgeColor}20; color:${badgeColor};">${p.status}</span></td>
+                                <td>
+                                    <button onclick="updateRxStatus(${p.id}, 'Approved')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:bold; margin-right:5px;">Approve</button>
+                                    <button onclick="updateRxStatus(${p.id}, 'Rejected')" style="background:#ef4444; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:bold;">Reject</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No pending prescriptions.</td></tr>';
+                }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="5">Error loading...</td></tr>'; }
+        }
+
+        async function updateRxStatus(id, status) {
+            try {
+                const res = await fetch(`${API_BASE}/api/pharmacy/prescriptions/${id}/status`, {
+                    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ status })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Prescription ${status}!`);
+                    loadPrescriptions(); // refresh
+                } else { showToast(data.message, "error"); }
+            } catch (e) { showToast("Error updating prescription", "error"); }
+        }
+
+        async function loadInventory() {
+            const tbody = document.getElementById('inventoryTableBody');
+            try {
+                const res = await fetch(`${API_BASE}/api/products`);
+                const data = await res.json();
+                if (data.success) {
+                    tbody.innerHTML = '';
+                    data.products.forEach(p => {
+                        const stockBadge = p.stock < 20 ? '<span class="badge badge-danger">Low Stock</span>' : '<span class="badge badge-success">In Stock</span>';
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>#${p.id}</td>
+                                <td style="font-weight: 700;">${p.name}</td>
+                                <td>${p.category}</td>
+                                <td>₹${Number(p.price).toFixed(2)}</td>
+                                <td>${p.stock}</td>
+                                <td>${stockBadge}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="6">Error loading inventory...</td></tr>'; }
+        }
+
+        // Init
+        loadOrders();
+    </script>
+    <script src="chatWidget.js"></script>
+    <script>
+        // Init chat with pharmacy role context
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.injectChatWidget) injectChatWidget('pharmacy');
+        });
+    </script>
+</body>
+
+</html>

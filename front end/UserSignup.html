@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up | Pharma Wave</title>
+    <link rel="stylesheet" href="style1.css">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="config.js"></script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        const firebaseConfig = {
+            apiKey: "AIzaSyCxFspLccHlPDbmMCgZkI5VQPEg0IK4xfk",
+            authDomain: "pro-pharma-wave.firebaseapp.com",
+            projectId: "pro-pharma-wave",
+            storageBucket: "pro-pharma-wave.firebasestorage.app",
+            messagingSenderId: "528351606474",
+            appId: "1:528351606474:web:e6cde01d2545aa7b236633"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+        // Expose auth for the regular script below
+        window._pharmaFirebaseAuth = auth;
+        window.handleFirebaseGoogleSignup = async function() {
+            const btn = document.getElementById('googleSignupBtn');
+            btn.textContent = 'Signing in...';
+            btn.disabled = true;
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                localStorage.setItem('pharmaUser', JSON.stringify({
+                    userId: user.uid,
+                    username: user.displayName || user.email.split('@')[0],
+                    profile_pic: user.photoURL,
+                    email: user.email,
+                    role: 'user',
+                    token: await user.getIdToken()
+                }));
+                const toast = document.getElementById('toast');
+                toast.textContent = 'Google Sign Up Successful! Redirecting...';
+                toast.className = 'show success';
+                setTimeout(() => { window.location.href = 'Front.html'; }, 1500);
+            } catch(err) {
+                const toast = document.getElementById('toast');
+                toast.textContent = 'Google Sign-Up failed: ' + (err.message || 'Unknown error');
+                toast.className = 'show error';
+                btn.textContent = 'Sign up with Google';
+                btn.disabled = false;
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <a href="Front.html" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="40" height="40" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    style="overflow: visible; filter: drop-shadow(0 4px 6px rgba(16,185,129,0.3));">
+                    <defs>
+                        <linearGradient id="pw-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="100%" stop-color="#34d399" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 25 85 L 25 25 A 20 20 0 0 1 25 65" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 60 45 L 80 85 L 100 45 L 120 85 L 145 15" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 115 15 L 145 15 L 145 45" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                PharmaWave
+            </a>
+        </div>
+        <div class="navigation">
+            <ul>
+                <li><a href="Front.html#catalog">Medicines</a></li>
+                <li><a href="#">Locations</a></li>
+                <li><a href="#">24/7 Support</a></li>
+                <li><a href="DirectLogin.html" class="nav-btn login" id="authBtn">Login</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast"></div>
+
+    <div class="auth-page" style="padding-top: 120px; padding-bottom: 60px;">
+        <div class="form-box">
+            <div class="auth-header">
+                <h2>Create <span class="animated-gradient-text">Account</span></h2>
+                <h3>Join Pharma Wave for exclusive benefits</h3>
+            </div>
+
+            <div class="input-box">
+                <input type="text" id="username" class="input-field" placeholder="Username">
+            </div>
+            <div class="input-box">
+                <input type="text" id="emailOrMobile" class="input-field" placeholder="Email or Mobile Number">
+            </div>
+            <div class="input-box">
+                <input type="password" id="password" class="input-field" placeholder="Password">
+            </div>
+            <div class="input-box">
+                <input type="password" id="confirmPassword" class="input-field" placeholder="Confirm Password">
+            </div>
+
+            <input type="submit" class="submit-btn" value="Create Account">
+
+            <div class="divider" style="text-align: center; margin: 20px 0; position: relative;">
+                <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                <span
+                    style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: rgba(30, 41, 59, 1); padding: 0 10px; color: var(--text-muted); font-size: 14px;">OR</span>
+            </div>
+
+            <button id="googleSignupBtn" onclick="handleFirebaseGoogleSignup()" style="width:100%; padding:14px; background:white; border:1px solid #dadce0; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:15px; font-weight:600; color:#3c4043; cursor:pointer; transition:box-shadow 0.2s; margin-bottom: 10px;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.boxShadow='none'">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20">
+                Sign up with Google
+            </button>
+
+            <div class="Two-col">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="register-check" style="width:16px; height:16px; border-radius: 4px;">
+                    <label for="register-check" style="cursor: pointer;">Remember Me</label>
+                </div>
+                <div><a href="#" style="color: var(--primary); text-decoration: none; font-weight: 700;">Terms &
+                        Conditions</a></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Script -->
+    <script>
+        // Setup Toast System
+        const toast = document.getElementById("toast");
+        const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
+
+        function showToast(message, type = "success") {
+            toast.textContent = message;
+            toast.className = "show " + type;
+            setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+        (function () {
+            const submitBtn = document.querySelector('.submit-btn');
+
+            submitBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+
+                const username = document.querySelector('#username').value.trim();
+                const contact = document.querySelector('#emailOrMobile').value.trim();
+                const password = document.querySelector('#password').value;
+                const confirmPassword = document.querySelector('#confirmPassword').value;
+
+                if (!username || !contact || !password) {
+                    showToast('Please fill all fields!', "error");
+                    return;
+                }
+
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const mobileRegex = /^[6-9]\d{9}$/;
+
+                if (!emailRegex.test(contact) && !mobileRegex.test(contact)) {
+                    showToast('Enter a valid Email or 10-digit Mobile Number', "error");
+                    return;
+                }
+
+                if (password !== confirmPassword) {
+                    showToast('Passwords do not match!', "error");
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.value = "Creating account...";
+
+                try {
+                    // Only register in Firebase if it's an email (not mobile)
+                    if (emailRegex.test(contact)) {
+                        // Use global firebaseAuth set by the module script
+                        const { getAuth, createUserWithEmailAndPassword, updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+                        const auth = window._pharmaFirebaseAuth;
+                        if (auth) {
+                            const userCred = await createUserWithEmailAndPassword(auth, contact, password);
+                            await updateProfile(userCred.user, { displayName: username });
+
+                            localStorage.setItem('pharmaUser', JSON.stringify({
+                                userId: userCred.user.uid,
+                                username: username,
+                                email: contact,
+                                role: 'user',
+                                token: await userCred.user.getIdToken()
+                            }));
+
+                            showToast("Welcome! Account created! Redirecting...", "success");
+                            submitBtn.style.background = "var(--primary)";
+                            submitBtn.value = "Success!";
+                            setTimeout(() => window.location.href = "Front.html", 2000);
+                            return;
+                        }
+                    }
+
+                    // Fallback: mobile number registration via backend
+                    const res = await fetch(`${API_BASE}/register`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username, contact, password })
+                    });
+                    const data = await res.json();
+
+                    if (res.ok && data.success) {
+                        localStorage.setItem('pharmaUser', JSON.stringify({
+                            username: username,
+                            role: 'user',
+                            token: data.token
+                        }));
+                        showToast("Welcome! Redirecting...", "success");
+                        submitBtn.style.background = "var(--primary)";
+                        submitBtn.value = "Success!";
+                        setTimeout(() => window.location.href = "Front.html", 2500);
+                    } else {
+                        showToast(data.message || "Registration failed", "error");
+                        submitBtn.disabled = false;
+                        submitBtn.value = "Create Account";
+                    }
+
+                } catch (err) {
+                    let msg = "Registration failed.";
+                    if (err.code === "auth/email-already-in-use") msg = "This email is already registered. Try logging in!";
+                    else if (err.code === "auth/weak-password") msg = "Password must be at least 6 characters.";
+                    else if (err.code === "auth/invalid-email") msg = "Please enter a valid email address.";
+                    showToast(msg, "error");
+                    submitBtn.disabled = false;
+                    submitBtn.value = "Create Account";
+                }
+            });
+        })();
+    </script>
+</body>
+
+</html>

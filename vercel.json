@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "public": true,
+  "name": "pharma-wave-frontend",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/front end/$1" }
+  ]
+}

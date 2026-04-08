@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharma Wave | Premium Health Delivery</title>
+    <link rel="stylesheet" href="style1.css">
+    <!-- Ionicons for modern icons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="config.js"></script>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <a href="Front.html" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
+                <svg width="40" height="40" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    style="overflow: visible; filter: drop-shadow(0 4px 6px rgba(16,185,129,0.3));">
+                    <defs>
+                        <linearGradient id="pw-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="100%" stop-color="#34d399" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 25 85 L 25 25 A 20 20 0 0 1 25 65" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 60 45 L 80 85 L 100 45 L 120 85 L 145 15" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 115 15 L 145 15 L 145 45" stroke="url(#pw-gradient)" stroke-width="16"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                PharmaWave
+            </a>
+        </div>
+        <div class="navigation">
+            <ul>
+                <li><button onclick="toggleDarkMode()" id="darkModeBtn" style="background:none; border:none; color:var(--text-muted); font-size:20px; cursor:pointer; display:flex; align-items:center; transition:color 0.2s;" title="Toggle Dark Mode"><ion-icon name="moon"></ion-icon></button></li>
+                <li><a href="#catalog">Medicines</a></li>
+                <li><a href="#" onclick="showWishlistModal()"><ion-icon name="heart" style="color: #ef4444; margin-right:4px; vertical-align:middle;"></ion-icon> Wishlist</a></li>
+                <li><a href="javascript:void(0)" onclick="toggleAIChat()">24/7 Support</a></li>
+                <li><a href="DirectLogin.html" class="nav-btn login" id="authBtn">Login</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="badge">
+                <ion-icon name="flash"></ion-icon>
+                Lightning Fast Delivery
+            </div>
+            <h1>Your Health, <br>Delivered <span class="animated-gradient-text">24/7</span></h1>
+            <p>Get authentic medicines and healthcare products delivered to your doorstep in minutes. Experience the
+                future of pharmacy today.</p>
+            <a href="#catalog" class="hero-btn">
+                Order Now <ion-icon name="arrow-forward-outline"></ion-icon>
+            </a>
+        </div>
+    </section>
+
+    <!-- SEARCH BAR SECTION -->
+    <section class="search-section"
+        style="max-width: 800px; margin: -40px auto 40px auto; position: relative; z-index: 10; padding: 0 20px;">
+        <div
+            style="background: white; border-radius: 50px; padding: 10px 20px; display: flex; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid var(--border-dark);">
+            <ion-icon name="search-outline"
+                style="font-size: 24px; color: var(--text-muted); margin-right: 15px;"></ion-icon>
+            <input type="text" id="searchInput" placeholder="Search medicines by name or category..."
+                style="flex: 1; border: none; outline: none; font-size: 16px; color: var(--text-main); font-family: inherit; background: transparent;">
+
+            <div style="width: 1px; height: 30px; background: var(--border-dark); margin: 0 15px;"></div>
+
+            <input type="file" id="imageSearchInput" accept="image/*" style="display: none;">
+            <button onclick="document.getElementById('imageSearchInput').click()"
+                style="background: var(--surface); border: 1px solid var(--border-dark); color: var(--primary); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;"
+                onmouseover="this.style.background='rgba(16,185,129,0.1)'; this.style.borderColor='var(--primary)'"
+                onmouseout="this.style.background='var(--surface)'; this.style.borderColor='var(--border-dark)'"
+                title="Search by uploading a prescription or medicine image">
+                <ion-icon name="camera" style="font-size: 20px;"></ion-icon>
+            </button>
+        </div>
+    </section>
+
+
+    <!-- PRODUCT CATALOG -->
+    <section class="catalog-section" id="catalog">
+        <h2 class="section-title">Premium Care Essentials</h2>
+        <p class="section-subtitle">Curated health products delivered instantly to your door.</p>
+
+        <!-- CATEGORY FILTERS -->
+        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap;">
+            <button class="category-btn active" onclick="filterCategory('All', this)">All</button>
+            <button class="category-btn" onclick="filterCategory('Pain Relief', this)">Pain Relief</button>
+            <button class="category-btn" onclick="filterCategory('Vitamins', this)">Vitamins</button>
+            <button class="category-btn" onclick="filterCategory('Cold & Flu', this)">Cold & Flu</button>
+            <button class="category-btn" onclick="filterCategory('First Aid', this)">First Aid</button>
+            <button class="category-btn" onclick="filterCategory('Allergy', this)">Allergy</button>
+        </div>
+
+        <div class="product-grid" id="productGrid">
+            <!-- Products injected by JS -->
+            <div style="text-align:center; grid-column: 1/-1; font-weight: 600; padding: 40px;">Initializing Store
+                System...</div>
+        </div>
+    </section>
+
+    <!-- FLOATING ACTIONS -->
+    <div class="floating-actions">
+        <div class="action-btn cart-btn" id="openCartBtn">
+            <ion-icon name="cart"></ion-icon>
+            <div class="cart-count" id="cartCount">0</div>
+        </div>
+        <div class="action-btn chat-btn" id="supportChatBtn"
+            onclick="openSupportChat()">
+            <ion-icon name="chatbubble-ellipses"></ion-icon>
+        </div>
+    </div>
+
+    <!-- CART MODAL -->
+    <div class="cart-modal" id="cartModal">
+        <div class="cart-header">
+            <h2>Your Cart</h2>
+            <button class="close-cart" id="closeCartBtn"><ion-icon name="close"></ion-icon></button>
+        </div>
+        <div class="cart-items" id="cartItemsContainer">
+            <!-- Cart items injected by JS -->
+            <p style="text-align: center; color: var(--text-muted); margin-top: 40px; font-weight: 500;">Your cart is
+                beautifully empty.</p>
+        </div>
+
+        <div
+            style="margin:20px 0; padding:15px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <strong style="color:#0369a1; display:flex; align-items:center; gap:5px;"><ion-icon
+                        name="repeat-outline"></ion-icon> Auto-Refill Monthly</strong>
+                <div style="font-size:12px; color:#0284c7;">Get 10% off & free delivery on subscriptions</div>
+            </div>
+            <label style="position:relative; display:inline-block; width:50px; height:24px;">
+                <input type="checkbox" id="subscribeToggle" style="opacity:0; width:0; height:0;">
+                <span
+                    style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#cbd5e1; transition:.4s; border-radius:24px;"></span>
+                <span class="toggle-slider"
+                    style="position:absolute; height:18px; width:18px; left:4px; bottom:3px; background-color:white; transition:.4s; border-radius:50%;"></span>
+            </label>
+        </div>
+        <style>
+            #subscribeToggle:checked+span {
+                background-color: #3b82f6;
+            }
+
+            #subscribeToggle:checked+span+.toggle-slider {
+                transform: translateX(24px);
+            }
+        </style>
+
+        <!-- NEW: CHECKOUT OPTIONS (Hidden if empty) -->
+        <div id="checkoutOptions" style="padding: 20px; border-top: 1px dashed var(--border-dark); display: none;">
+            <div style="margin-bottom: 20px;">
+                <label
+                    style="font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;">
+                    Delivery Address
+                    <button onclick="useLiveLocation()" id="liveLocBtn" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; transition: opacity 0.2s;">
+                        <ion-icon name="locate-outline" style="font-size: 16px;"></ion-icon> Use Live Location
+                    </button>
+                </label>
+                <select id="checkoutAddress"
+                    style="width: 100%; padding: 12px; margin-top: 8px; border-radius: 12px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; background: var(--surface);">
+                    <option value="">Select an address...</option>
+                </select>
+                <a href="Profile.html"
+                    style="font-size: 12px; color: var(--primary); font-weight: 700; text-decoration: none; margin-top: 5px; display: inline-block;">+
+                    Manage Addresses</a>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label
+                    style="font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase;">Delivery
+                    Timing</label>
+                <select id="checkoutSchedule"
+                    style="width: 100%; padding: 12px; margin-top: 8px; border-radius: 12px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; background: var(--surface);">
+                    <option value="ASAP">Emergency (In 30-60 mins)</option>
+                    <option value="Today Evening">Schedule for Today Evening</option>
+                    <option value="Tomorrow Morning">Schedule for Tomorrow Morning</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label
+                    style="font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase;">Payment
+                    Method</label>
+                <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+                    <label
+                        style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
+                        <input type="radio" name="paymentMethod" value="COD" checked
+                            style="accent-color: var(--primary);"> COD
+                    </label>
+                    <label
+                        style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
+                        <input type="radio" name="paymentMethod" value="UPI" style="accent-color: var(--primary);"> UPI
+                        / Card
+                    </label>
+                    <label
+                        style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
+                        <input type="radio" name="paymentMethod" value="Wallet" style="accent-color: var(--primary);">
+                        Wallet
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="cart-total">
+            <div class="total-row">
+                <span>Total</span>
+                <span>₹<span id="cartTotalAmount">0.00</span></span>
+            </div>
+            <button class="checkout-btn" id="checkoutBtn">Place Order</button>
+        </div>
+    </div>
+
+    <!-- AI Floating Chat Assistant -->
+    <div id="aiChatBtn"
+        style="position:fixed; bottom:30px; right:30px; width:60px; height:60px; background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:30px; box-shadow:0 10px 25px rgba(139, 92, 246, 0.4); cursor:pointer; z-index:100; transition:transform 0.2s;"
+        onclick="toggleAIChat()">
+        <ion-icon name="chatbubbles"></ion-icon>
+    </div>
+
+    <div id="aiChatWindow"
+        style="display:none; position:fixed; bottom:100px; right:30px; width:350px; background:white; border-radius:20px; box-shadow:0 15px 35px rgba(0,0,0,0.15); z-index:100; flex-direction:column; overflow:hidden; border:1px solid #e2e8f0;">
+        <div
+            style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); padding:20px; color:white; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:800; display:flex; align-items:center; gap:10px;"><ion-icon
+                    name="planet"></ion-icon> AI Pharmacist</div>
+            <ion-icon name="close" style="cursor:pointer; font-size:24px;" onclick="toggleAIChat()"></ion-icon>
+        </div>
+        <div id="aiChatMessages"
+            style="height:300px; padding:20px; overflow-y:auto; background:#f8fafc; display:flex; flex-direction:column; gap:15px;">
+            <div
+                style="background:white; padding:12px 16px; border-radius:15px 15px 15px 0; border:1px solid #e2e8f0; align-self:flex-start; font-size:14px; color:#334155;">
+                Hello! I am PharmaWave's AI Assistant. Tell me your symptoms, and I'll recommend the right medicines.
+            </div>
+        </div>
+        <div style="padding:15px; background:white; border-top:1px solid #e2e8f0; display:flex; gap:10px;">
+            <input type="text" id="aiChatInput" placeholder="E.g., I have a bad headache"
+                style="flex:1; padding:10px 15px; border-radius:50px; border:1px solid #cbd5e1; outline:none;"
+                onkeypress="if(event.key==='Enter') sendAIMessage()">
+            <button onclick="sendAIMessage()"
+                style="background:#3b82f6; color:white; border:none; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;"><ion-icon
+                    name="send"></ion-icon></button>
+        </div>
+    </div>
+
+    <!-- FOOTER NAV LINKS -->
+    <footer style="background: var(--surface-solid); border-top: 1px solid var(--border-light); padding: 40px 10%; margin-top: 80px; text-align: center;">
+        <div style="display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+            <div style="flex: 1; min-width: 200px;">
+                <h4 style="color: var(--text-main); margin-bottom: 15px;">For Customers</h4>
+                <a href="Front.html" style="display: block; color: var(--text-muted); text-decoration: none; margin-bottom: 8px;">Order Medicines</a>
+                <a href="Profile.html" style="display: block; color: var(--text-muted); text-decoration: none; margin-bottom: 8px;">My Profile</a>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <h4 style="color: var(--text-main); margin-bottom: 15px;">For Partners</h4>
+                <a href="AgentRegister.html" style="display: block; color: var(--text-muted); text-decoration: none; margin-bottom: 8px;">Become a Delivery Agent</a>
+                <a href="AgentLogin.html" style="display: block; color: var(--text-muted); text-decoration: none; margin-bottom: 8px;">Agent Login Portal</a>
+                <a href="DirectLogin.html" style="display: block; color: var(--text-muted); text-decoration: none; margin-bottom: 8px;">Pharmacy Network Login</a>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <h4 style="color: var(--text-main); margin-bottom: 15px;">Management</h4>
+                <a href="DirectLogin.html" style="display: block; color: var(--text-muted); text-decoration: none; margin-bottom: 8px;">Admin Login</a>
+            </div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 14px;">© 2026 PharmaWave. All rights reserved.</p>
+    </footer>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast"></div>
+
+    <script>
+        // Store State
+        let products = [];
+        let cart = [];
+        let wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+        let currentUser = null;
+
+        // Elements
+        const productGrid = document.getElementById('productGrid');
+        const cartModal = document.getElementById('cartModal');
+        const openCartBtn = document.getElementById('openCartBtn');
+        const closeCartBtn = document.getElementById('closeCartBtn');
+        const cartItemsContainer = document.getElementById('cartItemsContainer');
+        const cartCount = document.getElementById('cartCount');
+        const cartTotalAmount = document.getElementById('cartTotalAmount');
+        const checkoutBtn = document.getElementById('checkoutBtn');
+        const authBtn = document.getElementById('authBtn');
+        const toast = document.getElementById("toast");
+        const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
+
+        function showToast(message, type = "success") {
+            toast.textContent = message;
+            toast.className = "show " + type;
+            setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+        // Check Login Session
+        async function checkLoginSession() {
+            const storedUser = localStorage.getItem('pharmaUser');
+            if (storedUser) {
+                currentUser = JSON.parse(storedUser);
+                authBtn.innerHTML = `<img src="${currentUser.profile_pic || 'https://via.placeholder.com/150'}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:2px solid var(--primary);"> Profile`;
+                authBtn.href = "Profile.html";
+                authBtn.classList.remove('login');
+                authBtn.style.background = 'rgba(255,255,255,0.8)';
+                authBtn.style.color = 'var(--text-main)';
+                authBtn.style.boxShadow = 'var(--shadow-sm)';
+                authBtn.style.border = '1px solid var(--border-dark)';
+                authBtn.style.display = 'flex';
+                authBtn.style.alignItems = 'center';
+                authBtn.style.gap = '8px';
+
+                await fetchUserAddresses();
+            }
+        }
+
+        // Fetch User Addresses
+        async function fetchUserAddresses() {
+            try {
+                const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/addresses`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentUser.token || ''}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const addressSelect = document.getElementById('checkoutAddress');
+                    addressSelect.innerHTML = '<option value="">Select Delivery Address...</option>';
+                    data.addresses.forEach(addr => {
+                        const opt = document.createElement('option');
+                        opt.value = addr.id;
+                        opt.textContent = `${addr.title} - ${addr.full_address.substring(0, 30)}...`;
+                        if (addr.is_default) opt.selected = true;
+                        addressSelect.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to load addresses", e);
+            }
+        }
+
+        // Fetch Products
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_BASE}/api/products`);
+                const data = await response.json();
+
+                if (data.success) {
+                    products = data.products;
+                    renderProducts();
+                } else {
+                    productGrid.innerHTML = '<p style="text-align:center; grid-column: 1/-1;">Store systems offline.</p>';
+                }
+            } catch (error) {
+                console.error('Error loading products:', error);
+                productGrid.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color: #ef4444; font-weight:600;">Connection Error. Is the backend server running online?</p>';
+            }
+        }
+
+        // Render Products with Staggered Animation
+        function renderProducts(productsToRender = products) {
+            productGrid.innerHTML = '';
+
+            if (productsToRender.length === 0) {
+                productGrid.innerHTML = `
+                    <div style="text-align:center; grid-column: 1/-1; padding: 60px 20px;">
+                        <ion-icon name="search-outline" style="font-size: 48px; color: var(--text-muted); margin-bottom: 15px;"></ion-icon>
+                        <h3 style="color: var(--text-main); font-weight: 800; font-size: 20px; margin-bottom: 10px;">No exact matches found</h3>
+                        <p style="color: var(--text-muted);">Try adjusting your search terms or browsing our categories.</p>
+                    </div>`;
+                return;
+            }
+
+            productsToRender.forEach((product, index) => {
+                const rxBadge = product.category === 'Antibiotics' || product.category === 'Pain Relief' || product.category === 'Steroids'
+                    ? `<span style="position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 800;">Rx REQUIRED</span>`
+                    : '';
+                    
+                const isWished = wishlist.includes(product.id);
+                const heartColor = isWished ? '#ef4444' : '#cbd5e1';
+                
+                // Handle local uploaded images vs external URLs
+                const finalImageUrl = product.image_url && product.image_url.startsWith('/uploads') ? `${API_BASE}${product.image_url}` : product.image_url;
+
+                const card = document.createElement('div');
+                card.className = 'product-card animate-stagger';
+                card.style.animationDelay = `${index * 0.1}s`;
+                card.innerHTML = `
+                    <div style="position: absolute; top: 10px; left: 10px; z-index: 10; cursor: pointer; transition: transform 0.2s;" onclick="toggleWishlist(${product.id}, this)">
+                        <ion-icon name="heart" style="font-size: 24px; color: ${heartColor}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));"></ion-icon>
+                    </div>
+                    <div style="position: relative; height: 180px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-bottom: 1px solid var(--border-light);">
+                        <img src="${finalImageUrl}" alt="${product.name}" class="product-image" onerror="this.src=''; this.parentElement.innerHTML='<ion-icon name=\\'medkit\\' style=\\'font-size: 60px; color: #cbd5e1;\\'></ion-icon>'">
+                        ${rxBadge}
+                    </div>
+                    <div class="product-category">${product.category}</div>
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-desc" id="desc-${product.id}" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">${product.description}</div>
+                    <a href="javascript:void(0)" onclick="toggleDetails(${product.id})" id="btn-${product.id}" style="color: var(--primary); font-size: 12px; font-weight: 800; text-decoration: none; margin-bottom: 10px; display: inline-block;">View Details</a>
+                    <div class="product-footer">
+                        <div class="product-price">₹${Number(product.price).toFixed(2)}</div>
+                        <button class="add-btn" onclick="addToCart(${product.id})">
+                            <ion-icon name="add"></ion-icon>
+                        </button>
+                    </div>
+                `;
+                productGrid.appendChild(card);
+            });
+        }
+
+        // Toggle Product Details
+        function toggleDetails(productId) {
+            const descEl = document.getElementById(`desc-${productId}`);
+            const btnEl = document.getElementById(`btn-${productId}`);
+
+            if (descEl.style.webkitLineClamp === '2') {
+                descEl.style.webkitLineClamp = 'unset';
+                btnEl.textContent = 'Hide Details';
+            } else {
+                descEl.style.webkitLineClamp = '2';
+                btnEl.textContent = 'View Details';
+            }
+        }
+
+        // --- Search & Filter Logic ---
+        const searchInput = document.getElementById('searchInput');
+        const imageSearchInput = document.getElementById('imageSearchInput');
+        let currentCategory = 'All';
+
+        // Filter by Category Button
+        function filterCategory(category, element) {
+            // Update active state of buttons
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+            if (element) element.classList.add('active');
+
+            currentCategory = category;
+            applyFilters();
+        }
+
+        // Apply Text Search and Category together
+        function applyFilters() {
+            const query = searchInput.value.toLowerCase().trim();
+            const keywords = query.split(/\s+/).filter(k => k.length > 0);
+
+            let filtered = products;
+
+            // Apply Category
+            if (currentCategory !== 'All') {
+                filtered = filtered.filter(p => p.category === currentCategory);
+            }
+
+            // Apply Advanced Search
+            if (keywords.length > 0) {
+                filtered = filtered.filter(p => {
+                    const searchString = `${p.name} ${p.category} ${p.description}`.toLowerCase();
+                    // Must match all keywords for high relevance
+                    return keywords.every(kw => searchString.includes(kw));
+                });
+            }
+
+            renderProducts(filtered);
+        }
+
+        // Text Search Event
+        searchInput.addEventListener('input', applyFilters);
+
+        // Upload Prescription Button (previously Image Search)
+        imageSearchInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                if (!currentUser) {
+                    showToast("Please login to upload prescriptions.", "error");
+                    setTimeout(() => window.location.href = "DirectLogin.html", 1500);
+                    return;
+                }
+
+                showToast("Redirecting to secure Prescription Upload...", "success");
+                // Reset input
+                e.target.value = '';
+                setTimeout(() => window.location.href = "Profile.html", 1000);
+            }
+        });
+
+        // Cart Logic
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const existingItem = cart.find(item => item.id === productId);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
+
+            // Interactive Feedback
+            openCartBtn.style.transform = 'scale(1.2) translateY(-10px)';
+            cartCount.style.animation = 'none';
+            setTimeout(() => {
+                openCartBtn.style.transform = 'scale(1) translateY(0)';
+                cartCount.style.animation = 'popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+            }, 200);
+
+            showToast(`${product.name} added to cart`, 'success');
+            updateCartUI();
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.id !== productId);
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            // Count
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartCount.textContent = totalItems;
+
+            // Hide count if 0
+            cartCount.style.display = totalItems > 0 ? 'flex' : 'none';
+
+            // Total Amount
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            cartTotalAmount.textContent = total.toFixed(2);
+
+            // Render Items
+            if (cart.length === 0) {
+                cartItemsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 40px; font-weight: 500;">Your cart is beautifully empty.</p>';
+                document.getElementById('checkoutOptions').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('checkoutOptions').style.display = 'block';
+
+            cartItemsContainer.innerHTML = '';
+            cart.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'cart-item';
+                itemEl.innerHTML = `
+                    <div style="flex-grow: 1; margin-right: 15px;">
+                        <div style="font-weight: 800; margin-bottom: 6px; font-size: 16px;">${item.name}</div>
+                        <div style="color: var(--primary); font-size: 14px; font-weight: 600;">₹${Number(item.price).toFixed(2)} x ${item.quantity}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 900; margin-bottom: 10px; font-size: 18px;">₹${(item.price * item.quantity).toFixed(2)}</div>
+                        <button onclick="removeFromCart(${item.id})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 12px; font-weight: 800; letter-spacing: 1px; padding: 4px; border-radius: 4px; transition: background 0.2s;">REMOVE</button>
+                    </div>
+                `;
+                cartItemsContainer.appendChild(itemEl);
+            });
+        }
+
+        // Checkout Process
+        checkoutBtn.addEventListener('click', placeOrder);
+
+        async function placeOrder() {
+            if (cart.length === 0) {
+                showToast("Your cart is empty!", "error");
+                return;
+            }
+
+            if (!currentUser) {
+                showToast("Please login to place this order.", "error");
+                setTimeout(() => window.location.href = "DirectLogin.html", 2000);
+                return;
+            }
+
+            const addressId = document.getElementById('checkoutAddress').value;
+            if (!addressId) {
+                showToast("Please select a delivery address.", "error");
+                return;
+            }
+
+            const schedule = document.getElementById('checkoutSchedule').value;
+            const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+            const isSubscribed = document.getElementById('subscribeToggle').checked;
+
+            checkoutBtn.textContent = 'Processing...';
+            checkoutBtn.disabled = true;
+
+            try {
+                const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+                // Always create native order first
+                const response = await fetch(`${API_BASE}/api/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token || ''}`
+                    },
+                    body: JSON.stringify({
+                        userId: currentUser.userId,
+                        totalAmount: total,
+                        cartItems: cart,
+                        addressId: addressId,
+                        paymentMethod: paymentMethod === 'UPI' ? 'Online (Pending)' : paymentMethod,
+                        schedule: schedule
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+
+                    // Trigger Stripe Checkout if Online Payment
+                    if (paymentMethod === 'UPI') {
+                        showToast(`Redirecting to Secure Payment Gateway...`, "success");
+                        const stripeRes = await fetch(`${API_BASE}/api/payment/create-checkout-session`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${currentUser.token || ''}`
+                            },
+                            body: JSON.stringify({ orderId: data.orderId })
+                        });
+
+                        const stripeData = await stripeRes.json();
+
+                        // Clear cart proactively since we are redirecting
+                        cart = [];
+                        updateCartUI();
+
+                        if (stripeData.success && stripeData.url) {
+                            window.location.href = stripeData.url;
+                            return; // Stop execution, browser navigating away
+                        } else {
+                            showToast("Payment initialization failed: " + stripeData.message, "error");
+                        }
+                    }
+
+                    // For COD / Wallet
+                    if (isSubscribed) {
+                        try {
+                            await fetch(`${API_BASE}/api/subscriptions`, {
+                                method: 'POST', headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${currentUser.token || ''}`
+                                },
+                                body: JSON.stringify({ userId: currentUser.userId, cartItems: cart })
+                            });
+                            showToast("Monthly Subscription Activated!", "success");
+                        } catch (e) {
+                            showToast("Subscription activation failed.", "error");
+                        }
+                    }
+
+                    showToast(`✅ Order placed! ID: #${data.orderId}`, "success");
+                    cart = [];
+                    updateCartUI();
+                    setTimeout(() => cartModal.classList.remove('open'), 1500);
+                } else {
+                    showToast("Order failed: " + data.message, "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Server connection error during checkout.", "error");
+            } finally {
+                checkoutBtn.textContent = 'Place Order';
+                checkoutBtn.disabled = false;
+            }
+        }
+
+        // Cart Modal Toggle
+        openCartBtn.addEventListener('click', () => cartModal.classList.add('open'));
+        closeCartBtn.addEventListener('click', () => cartModal.classList.remove('open'));
+
+        // Init
+        checkLoginSession();
+        checkThemeSession();
+        loadProducts();
+        updateCartUI(); // Initial hide of cart count
+
+        // ==========================================
+        // PRO FEATURES (Phase 5)
+        // ==========================================
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('darkModeBtn').innerHTML = `<ion-icon name="${isDark ? 'sunny' : 'moon'}"></ion-icon>`;
+        }
+        function checkThemeSession() {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-mode');
+                document.getElementById('darkModeBtn').innerHTML = `<ion-icon name="sunny"></ion-icon>`;
+            }
+        }
+        function toggleWishlist(productId, iconDiv) {
+            const index = wishlist.indexOf(productId);
+            const icon = iconDiv.querySelector('ion-icon');
+            if (index > -1) {
+                wishlist.splice(index, 1);
+                icon.style.color = '#cbd5e1';
+                showToast('Removed from Wishlist', 'success');
+            } else {
+                wishlist.push(productId);
+                icon.style.color = '#ef4444';
+                iconDiv.style.transform = 'scale(1.3)';
+                setTimeout(() => iconDiv.style.transform = 'scale(1)', 200);
+                showToast('Added to Wishlist ❤️', 'success');
+            }
+            localStorage.setItem('wishlist', JSON.stringify(wishlist));
+        }
+        function showWishlistModal() {
+            if(wishlist.length === 0) {
+                showToast("Your Wishlist is empty!", "error");
+                return;
+            }
+            // Filter products and show only wishlist items
+            currentCategory = 'All';
+            const wishedProducts = products.filter(p => wishlist.includes(p.id));
+            renderProducts(wishedProducts);
+            document.getElementById('catalog').scrollIntoView({ behavior: 'smooth' });
+            showToast(`Displaying ${wishedProducts.length} saved items`, "success");
+        }
+
+        function toggleAIChat() {
+            const chat = document.getElementById('aiChatWindow');
+            chat.style.display = chat.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        async function sendAIMessage() {
+            const input = document.getElementById('aiChatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const chatBox = document.getElementById('aiChatMessages');
+
+            // User message bubble
+            chatBox.innerHTML += `
+                <div style="background:#3b82f6; color:white; padding:12px 16px; border-radius:15px 15px 0 15px; align-self:flex-end; font-size:14px;">
+                    ${msg}
+                </div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ai/recommend`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symptom: msg })
+                });
+                const data = await res.json();
+
+                let productHtml = '';
+                if (data.products && data.products.length > 0) {
+                    productHtml = `<div style="margin-top:10px; display:flex; flex-direction:column; gap:5px;">`;
+                    data.products.forEach(p => {
+                        productHtml += `<div style="background:white; border:1px solid #e2e8f0; padding:8px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:700;">${p.name} <span style="font-size:10px;color:#f59e0b;">₹${p.price}</span></span>
+                            <button onclick="addToCart(${p.id}); showToast('Added ${p.name}', 'success')" style="background:#10b981; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">+ Add</button>
+                        </div>`;
+                    });
+                    productHtml += `</div>`;
+                }
+
+                // AI Response bubble
+                chatBox.innerHTML += `
+                    <div style="background:white; padding:12px 16px; border-radius:15px 15px 15px 0; border:1px solid #d8b4fe; align-self:flex-start; font-size:14px; color:#334155; border-left:4px solid #8b5cf6;">
+                        ${data.message}
+                        ${productHtml}
+                    </div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (e) {
+                chatBox.innerHTML += `<div style="background:#fee2e2; color:#991b1b; padding:12px; border-radius:15px; align-self:center; font-size:12px;">Connection error to AI brain.</div>`;
+            }
+        }
+
+
+        function findNearbyPharmacies() {
+            if ("geolocation" in navigator) {
+                showToast("Scanning your location...", "success");
+                setTimeout(() => {
+                    showToast("Found 3 Partner Pharmacies within 2km! Loading catalog...", "success");
+                    // In a real app, this would filter the catalog or redirect
+                }, 2000);
+            } else {
+                showToast("Geolocation is not supported by your browser", "error");
+            }
+        }
+
+
+        // --- NEW: LIVE LOCATION FEATURE ---
+        async function useLiveLocation() {
+            if (!currentUser) {
+                showToast("Please login to use live location.", "error");
+                return;
+            }
+
+            const btn = document.getElementById('liveLocBtn');
+            const originalContent = btn.innerHTML;
+
+            if (!("geolocation" in navigator)) {
+                showToast("Geolocation not supported.", "error");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.innerHTML = `<ion-icon name="sync" class="animate-spin"></ion-icon> Locating...`;
+            showToast("Accessing GPS...", "success");
+
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                
+                try {
+                    // Reverse Geocoding using Nominatim (Free/No Key)
+                    const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                    const geoData = await geoRes.json();
+                    
+                    if (geoData && geoData.display_name) {
+                        const fullAddr = geoData.display_name;
+                        
+                        // Save this as a new address automatically
+                        const saveRes = await fetch(`${API_BASE}/api/user/${currentUser.userId}/addresses`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${currentUser.token || ''}`
+                            },
+                            body: JSON.stringify({
+                                title: "Current Location (Live)",
+                                full_address: fullAddr,
+                                is_default: true
+                            })
+                        });
+
+                        const saveData = await saveRes.json();
+                        if (saveData.success) {
+                            showToast("Location secured & saved!", "success");
+                            await fetchUserAddresses(); // Refresh list
+                            // Find the new live address and select it
+                            const addressSelect = document.getElementById('checkoutAddress');
+                            // The most recent default address should already be selected by fetchUserAddresses
+                        } else {
+                            showToast("Failed to save live location.", "error");
+                        }
+                    } else {
+                        showToast("Could not resolve address string.", "error");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    showToast("Error retrieving address.", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.innerHTML = originalContent;
+                }
+            }, (err) => {
+                showToast("Location access denied or failed.", "error");
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.innerHTML = originalContent;
+            }, { enableHighAccuracy: true });
+        }
+
+        // Support Chat Logic
+        function openSupportChat() {
+            const chatWindow = document.getElementById('pw-chat-window');
+            if (!chatWindow) {
+                if (typeof injectChatWidget === 'function') {
+                    injectChatWidget();
+                    // Give it a tiny moment to inject then open
+                    setTimeout(() => {
+                        const win = document.getElementById('pw-chat-window');
+                        if (win) win.style.display = 'flex';
+                    }, 100);
+                } else {
+                    showToast("Support system initializing...", "success");
+                }
+            } else {
+                chatWindow.style.display = chatWindow.style.display === 'none' ? 'flex' : 'none';
+            }
+        }
+
+        // Initialize Chat Widget if user is logged in
+        document.addEventListener('DOMContentLoaded', () => {
+            if (currentUser && typeof injectChatWidget === 'function') {
+                injectChatWidget();
+            }
+        });
+
+    </script>
+    <script src="chatWidget.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmaWave | Driver Dashboard</title>
+    <link rel="stylesheet" href="style1.css">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="config.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            background: #f8fafc;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .driver-layout {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .driver-sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+            color: white;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .driver-logo {
+            font-size: 22px;
+            font-weight: 900;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 40px;
+        }
+
+        .driver-logo ion-icon {
+            color: #f59e0b;
+        }
+
+        /* Orange accent for delivery */
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #9ca3af;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-item.active {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            box-shadow: inset 4px 0 0 #f59e0b;
+        }
+
+        .driver-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .stat-info h3 {
+            margin: 0;
+            color: #64748b;
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-info .value {
+            font-size: 32px;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        }
+
+        .order-details {
+            flex: 1;
+        }
+
+        .order-meta {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .order-address {
+            font-size: 16px;
+            color: #0f172a;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .order-contact {
+            font-size: 14px;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+        }
+
+        .map-placeholder {
+            width: 100%;
+            height: 200px;
+            background: #e2e8f0;
+            border-radius: 12px;
+            margin-top: 15px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-weight: 600;
+            flex-direction: column;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toast"></div> <!-- Assumes toast styling is in style1.css -->
+
+    <div class="driver-layout">
+        <div class="driver-sidebar">
+            <div class="logo" style="margin-bottom: 30px; padding: 0 10px;">
+                <a href="AgentLogin.html" style="display: flex; align-items: center; gap: 10px; color: white; text-decoration: none; font-size: 22px; font-weight: 900;">
+                    <svg width="35" height="35" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 0 8px rgba(16,185,129,0.5));">
+                        <path d="M 25 85 L 25 25 A 20 20 0 0 1 25 65" stroke="#10b981" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M 60 45 L 80 85 L 100 45 L 120 85 L 145 15" stroke="#10b981" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>PharmaFleet</span>
+                </a>
+            </div>
+
+            <!-- Profile & Online Toggle summary -->
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="agentInitials" style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;">--</div>
+                    <div>
+                        <div id="sideAgentName" style="font-weight: 700; font-size: 14px;">Loading...</div>
+                        <div id="sideAgentId" style="font-size: 11px; color: #9ca3af;">Agent #--</div>
+                    </div>
+                </div>
+                <!-- Availability Toggle -->
+                <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                    <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;" onchange="showToast(this.checked ? 'You are now Online' : 'You are now Offline', this.checked ? 'success' : 'error')">
+                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary); transition: .4s; border-radius: 34px;"></span>
+                    <span style="position: absolute; content: ''; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; transform: translateX(20px);"></span>
+                </label>
+            </div>
+
+            <div class="nav-item active" onclick="switchTab('pool', this)">
+                <ion-icon name="list-circle"></ion-icon> Order Pool
+            </div>
+            <div class="nav-item" onclick="switchTab('deliveries', this)">
+                <ion-icon name="map"></ion-icon> Active Deliveries
+            </div>
+            <div class="nav-item" onclick="switchTab('earnings', this)">
+                <ion-icon name="wallet"></ion-icon> Earnings Hub
+            </div>
+            <div class="nav-item" onclick="switchTab('performance', this)">
+                <ion-icon name="stats-chart"></ion-icon> Performance
+            </div>
+            <div class="nav-item" onclick="switchTab('profile', this)">
+                <ion-icon name="person"></ion-icon> Profile & Vehicle
+            </div>
+            <div class="nav-item" onclick="switchTab('support', this)">
+                <ion-icon name="help-buoy"></ion-icon> Help & Support
+            </div>
+
+            <div style="flex: 1;"></div>
+            <div class="nav-item" onclick="window.location.href='AgentLogin.html'" style="color: #ef4444;">
+                <ion-icon name="log-out"></ion-icon> Log Out
+            </div>
+        </div>
+
+        <div class="driver-content">
+
+            <!-- POOL TAB -->
+            <div id="tab-pool" class="tab-panel active">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 30px;">
+                    <div>
+                        <h1 style="margin:0; font-size:32px; font-weight:900; color:#0f172a;">Order Pool</h1>
+                        <p style="color:#64748b; font-weight:600; margin:5px 0 0 0;">Accept new delivery requests.</p>
+                    </div>
+                    <div style="position: relative; cursor: pointer;">
+                        <ion-icon name="notifications" style="font-size: 28px; color: #64748b;"></ion-icon>
+                        <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; font-weight: 800;">3</span>
+                    </div>
+                </div>
+
+                <div id="poolContainer">
+                    <p style="color:#64748b; font-weight:600;">Scanning for nearby requests...</p>
+                </div>
+            </div>
+
+            <!-- DELIVERIES TAB -->
+            <div id="tab-deliveries" class="tab-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 30px;">
+                    <div>
+                        <h1 style="margin:0; font-size:32px; font-weight:900; color:#0f172a;">Active Deliveries</h1>
+                        <p style="color:#64748b; font-weight:600; margin:5px 0 0 0;">Accept pickups and navigate to
+                            customers.</p>
+                    </div>
+                    <div
+                        style="background:#dcfce7; color:#166534; padding:8px 16px; border-radius:50px; font-weight:800; font-size:14px; display:flex; align-items:center; gap:5px;">
+                        <span
+                            style="width:8px; height:8px; background:#166534; border-radius:50%; display:inline-block;"></span>
+                        Online
+                    </div>
+                </div>
+
+                <div id="deliveriesContainer">
+                    <p style="color:#64748b; font-weight:600;">Searching for nearby requests...</p>
+                </div>
+            </div>
+
+            <!-- EARNINGS TAB -->
+            <div id="tab-earnings" class="tab-panel">
+                <h1 style="margin:0 0 30px 0; font-size:32px; font-weight:900; color:#0f172a;">Earnings Hub</h1>
+
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <h3>Total Payout</h3>
+                            <div class="value" id="valEarnings">₹0.00</div>
+                        </div>
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <ion-icon name="cash"></ion-icon>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <h3>Trips Completed</h3>
+                            <div class="value" id="valTrips">0</div>
+                        </div>
+                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                            <ion-icon name="bicycle"></ion-icon>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 30px; border-radius: 20px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 30px;">
+                    <ion-icon name="star" style="font-size:48px; color:#f59e0b; margin-bottom:15px;"></ion-icon>
+                    <h2 style="margin:0 0 10px 0; color:#0f172a;">Great Job!</h2>
+                    <p style="color:#64748b; margin:0;">You are doing fantastic. Keep up the flawless delivery ratings!</p>
+                </div>
+
+                <h3 style="margin-bottom: 15px; color: #0f172a;">Recent Payments</h3>
+                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+                    <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-weight: 700; color: #64748b; font-size: 14px;">
+                        <span>Date</span>
+                        <span>Amount</span>
+                        <span>Status</span>
+                    </div>
+                    <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600;">Today</span>
+                        <span style="font-weight: 800;">₹450.00</span>
+                        <span style="color: #10b981; font-size: 12px; font-weight: 800; background: #dcfce7; padding: 4px 8px; border-radius: 6px;">Paid</span>
+                    </div>
+                    <div style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600;">Yesterday</span>
+                        <span style="font-weight: 800;">₹850.00</span>
+                        <span style="color: #10b981; font-size: 12px; font-weight: 800; background: #dcfce7; padding: 4px 8px; border-radius: 6px;">Paid</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PERFORMANCE TAB -->
+            <div id="tab-performance" class="tab-panel">
+                <h1 style="margin:0 0 30px 0; font-size:32px; font-weight:900; color:#0f172a;">My Performance</h1>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <h3>Average Rating</h3>
+                            <div class="value">4.9 <ion-icon name="star" style="color: #f59e0b; font-size: 24px;"></ion-icon></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <h3>On-Time Delivery</h3>
+                            <div class="value">98%</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <h3>Customer Compliments</h3>
+                            <div class="value">45</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 30px; text-align: center;">
+                    <img src="https://via.placeholder.com/400x200?text=Monthly+Performance+Chart" style="width: 100%; max-width: 600px; border-radius: 10px;">
+                    <p style="color: #64748b; font-weight: 600; margin-top: 15px;">Your delivery times have improved by 12% this month.</p>
+                </div>
+            </div>
+
+            <!-- PROFILE TAB -->
+            <div id="tab-profile" class="tab-panel">
+                <h1 style="margin:0 0 30px 0; font-size:32px; font-weight:900; color:#0f172a;">Profile & Vehicle</h1>
+                <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px; background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+                        <h3 style="margin-top: 0;">Personal Details</h3>
+                        <div style="margin-bottom: 20px;">
+                            <label style="color: #64748b; font-weight: 600; font-size: 13px;">Full Name</label>
+                            <input type="text" id="agentName" value="" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px; font-weight: 600;">
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="color: #64748b; font-weight: 600; font-size: 13px;">Mobile Number</label>
+                            <input type="text" id="agentPhone" value="" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px; font-weight: 600;">
+                        </div>
+                        <button class="btn btn-primary" onclick="saveAgentProfile()" style="width: 100%; justify-content: center;">Save Profile Changes</button>
+                    </div>
+                    <div style="flex: 1; min-width: 300px; background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0;">
+                        <h3 style="margin-top: 0;">Vehicle Details</h3>
+                        <div style="margin-bottom: 20px;">
+                            <label style="color: #64748b; font-weight: 600; font-size: 13px;">Vehicle Type</label>
+                            <select id="agentVehicle" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px; font-weight: 600;">
+                                <option>Motorcycle</option>
+                                <option>Electric Bike</option>
+                                <option>Bicycle</option>
+                                <option>Van</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="color: #64748b; font-weight: 600; font-size: 13px;">License Plate</label>
+                            <input type="text" id="agentPlate" value="" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 5px; font-weight: 600;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUPPORT TAB -->
+            <div id="tab-support" class="tab-panel">
+                <h1 style="margin:0 0 30px 0; font-size:32px; font-weight:900; color:#0f172a;">Help & Support</h1>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer;" onclick="window.location.href='tel:+91123456789'">
+                        <ion-icon name="call" style="font-size: 40px; color: #3b82f6; margin-bottom: 15px;"></ion-icon>
+                        <h3 style="margin: 0 0 10px 0;">Call Dispatch</h3>
+                        <p style="color: #64748b; font-size: 14px;">Instant connection to the central team.</p>
+                    </div>
+                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer;" onclick="showToast('Connecting to Support Chat...', 'success')">
+                        <ion-icon name="chatbubbles" style="font-size: 40px; color: #10b981; margin-bottom: 15px;"></ion-icon>
+                        <h3 style="margin: 0 0 10px 0;">Live Chat</h3>
+                        <p style="color: #64748b; font-size: 14px;">Chat with a support executive.</p>
+                    </div>
+                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer;" onclick="reportIssue()">
+                        <ion-icon name="warning" style="font-size: 40px; color: #ef4444; margin-bottom: 15px;"></ion-icon>
+                        <h3 style="margin: 0 0 10px 0;">Report Issue</h3>
+                        <p style="color: #64748b; font-size: 14px;">Customer unavailable, wrong address, etc.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Proof of Delivery Modal -->
+    <div id="podModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 450px; text-align: center;">
+            <ion-icon name="shield-checkmark" style="font-size: 60px; color: #10b981; margin-bottom: 15px;"></ion-icon>
+            <h2 style="margin: 0 0 10px 0;">Proof of Delivery</h2>
+            <p style="color: #64748b; margin-bottom: 25px;">Please confirm the customer OTP or take a photo to mark the order as securely delivered.</p>
+            
+            <input type="text" id="podOtp" placeholder="Enter 4-Digit OTP" style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 18px; letter-spacing: 5px; text-align: center; margin-bottom: 15px; font-weight: 800;">
+            <div style="color: #64748b; font-weight: 600; margin-bottom: 15px;">— OR —</div>
+            <button onclick="showToast('Camera Opened', 'success')" style="background: #f8fafc; border: 2px dashed #cbd5e1; color: #475569; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 25px;">
+                <ion-icon name="camera" style="font-size: 24px;"></ion-icon> Capture Photo Proof
+            </button>
+            
+            <div style="display: flex; gap: 15px;">
+                <button onclick="closePodModal()" style="flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: white; font-weight: 700; cursor: pointer;">Cancel</button>
+                <button id="podConfirmBtn" style="flex: 1; padding: 12px; border-radius: 10px; border: none; background: #10b981; color: white; font-weight: 700; cursor: pointer;">Confirm Delivery</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const currentUser = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+        const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
+        
+        if (!currentUser.token || (currentUser.role !== 'delivery' && currentUser.role !== 'admin')) {
+             window.location.href = "DirectLogin.html";
+        }
+
+        const toast = document.getElementById("toast");
+
+        function showToast(message, type = "success") {
+            if (!toast) return;
+            toast.textContent = message; toast.className = "show " + type;
+            setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+        function switchTab(tabId, el) {
+            document.querySelectorAll('.tab-panel').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(m => m.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            el.classList.add('active');
+
+            if (tabId === 'pool') loadPool();
+            if (tabId === 'deliveries') loadDeliveries();
+            if (tabId === 'earnings') loadEarnings();
+        }
+
+        let currentDeliveryId = null;
+
+        function showPodModal(orderId) {
+            currentDeliveryId = orderId;
+            document.getElementById('podModal').style.display = 'flex';
+        }
+
+        function closePodModal() {
+            currentDeliveryId = null;
+            document.getElementById('podOtp').value = '';
+            document.getElementById('podModal').style.display = 'none';
+        }
+
+        document.getElementById('podConfirmBtn').addEventListener('click', () => {
+            const otpCode = document.getElementById('podOtp').value;
+            showToast("Proof verified! Order Delivered.", "success");
+            closePodModal();
+            updateStatus(currentDeliveryId, 'Delivered');
+        });
+
+        function getAuthHeaders() {
+            return {
+                'Authorization': `Bearer ${currentUser.token || ''}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function loadAgentProfile() {
+            try {
+                const res = await fetch(`${API_BASE}/api/agent/profile/${currentUser.userId}`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    const p = data.profile;
+                    document.getElementById('agentName').value = p.username || '';
+                    document.getElementById('agentPhone').value = p.phone || '';
+                    document.getElementById('agentVehicle').value = p.vehicle_type || 'Motorcycle';
+                    document.getElementById('agentPlate').value = p.vehicle_number || '';
+                    
+                    // Update Sidebar
+                    document.getElementById('sideAgentName').textContent = p.username;
+                    document.getElementById('sideAgentId').textContent = `Agent #${currentUser.userId}`;
+                    const initials = p.username.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                    document.getElementById('agentInitials').textContent = initials || '??';
+                }
+            } catch (e) { console.error("Profile load error", e); }
+        }
+
+        async function saveAgentProfile() {
+            const data = {
+                username: document.getElementById('agentName').value,
+                phone: document.getElementById('agentPhone').value,
+                vehicle_type: document.getElementById('agentVehicle').value,
+                vehicle_number: document.getElementById('agentPlate').value
+            };
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/agent/profile/${currentUser.userId}`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast("Profile updated!");
+                    loadAgentProfile(); // Refresh UI
+                } else {
+                    showToast(result.message || "Save failed", "error");
+                }
+            } catch (e) { showToast("Save failed", "error"); }
+        }
+
+        function reportIssue() {
+            const msg = prompt("Please describe the issue (e.g. Customer unreachable):");
+            if (msg) showToast("Issue reported to dispatch.", "success");
+        }
+
+        async function loadDeliveries() {
+            const container = document.getElementById('deliveriesContainer');
+            try {
+                const res = await fetch(`${API_BASE}/api/delivery/assigned`, { headers: getAuthHeaders() });
+                if (res.status === 401 || res.status === 403) {
+                    window.location.href = "AgentLogin.html";
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.success && data.orders.length > 0) {
+                    container.innerHTML = '';
+                    data.orders.forEach(o => {
+                        const isReady = o.status === 'Ready for Delivery';
+                        const isOut = o.status === 'Out for Delivery';
+
+                        let buttonsHtml = '';
+                        if (o.status === 'Preparing') {
+                            buttonsHtml = `<div style="color:#f59e0b; font-weight:700;">Pharmacy is Preparing...</div>`;
+                        } else if (isReady) {
+                            buttonsHtml = `<button class="btn btn-primary" onclick="updateStatus(${o.id}, 'Out for Delivery')"><ion-icon name="bicycle"></ion-icon> Start Delivery</button>`;
+                        } else if (isOut) {
+                            buttonsHtml = `
+                                <button class="btn btn-outline" onclick="toggleMap(${o.id})"><ion-icon name="navigate"></ion-icon> Navigate</button>
+                                <button class="btn btn-success" onclick="showPodModal(${o.id})"><ion-icon name="checkmark-circle"></ion-icon> Mark Delivered</button>
+                            `;
+                        }
+
+                        container.innerHTML += `
+                            <div class="order-card" id="order-${o.id}">
+                                <div class="order-details">
+                                    <div class="order-meta">Order #${o.id} • <span style="background: ${o.payment_method.includes('Paid') ? '#dcfce7; color: #166534' : '#fee2e2; color: #991b1b'}; padding: 2px 6px; border-radius: 4px;">${o.payment_method}</span></div>
+                                    
+                                    <div style="background:#f8fafc; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--primary);">
+                                        <div style="font-weight: 700; color: #0f172a; font-size: 13px;">Pickup From: <span style="color:var(--primary)">Main Pharmacy Store</span></div>
+                                    </div>
+                                    
+                                    <div class="order-address"><ion-icon name="location" style="color:#ef4444;"></ion-icon> Deliver to: ${o.full_address || 'Customer Location'}</div>
+                                    
+                                    <div style="margin: 8px 0; color: #ef4444; font-size: 12px; font-weight: 700;">
+                                        <ion-icon name="alert-circle"></ion-icon> Instructions: Require Prescription / Call customer.
+                                    </div>
+                                    
+                                    <div class="order-contact" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;"><ion-icon name="person"></ion-icon> Customer: ${o.customer_name} • <ion-icon name="call"></ion-icon> ${o.customer_phone || 'N/A'}</div>
+                                    
+                                    <div id="map-${o.id}" style="width:100%; height:250px; display:none; margin-top:15px; border-radius:12px; z-index: 1;"></div>
+                                </div>
+                                <div class="action-btns">
+                                    ${buttonsHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:50px; background:white; border-radius:20px; border: 1px dashed #cbd5e1;">
+                            <ion-icon name="cafe" style="font-size:48px; color:#cbd5e1; margin-bottom:15px;"></ion-icon>
+                            <h3 style="margin:0 0 10px 0; color:#334155;">No Delivery Requests</h3>
+                            <p style="color:#64748b; margin:0;">Take a break! We will notify you when a pharmacy marks an order as Ready.</p>
+                        </div>
+                    `;
+                }
+            } catch (e) { container.innerHTML = '<p style="color:red;">Failed to connect to Dispatch Server.</p>'; }
+        }
+
+        async function updateStatus(id, status) {
+            try {
+                const res = await fetch(`${API_BASE}/api/delivery/order/${id}/status`, {
+                    method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ status })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Status updated to ${status}`);
+                    loadDeliveries();
+                } else { showToast(data.message, "error"); }
+            } catch (e) { showToast("Network Error", "error"); }
+        }
+
+        async function loadEarnings() {
+            try {
+                const res = await fetch(`${API_BASE}/api/delivery/earnings`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('totalEarnings').textContent = `₹${data.earnings || 0}`;
+                    document.getElementById('totalTrips').textContent = data.trips || 0;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadPool() {
+            const container = document.getElementById('poolContainer');
+            try {
+                const res = await fetch(`${API_BASE}/api/delivery/pool`, { headers: getAuthHeaders() });
+                const data = await res.json();
+                
+                if (data.success && data.orders.length > 0) {
+                    container.innerHTML = '';
+                    data.orders.forEach(o => {
+                        container.innerHTML += `
+                            <div class="order-card">
+                                <div class="order-details">
+                                    <div class="order-meta">Order #${o.id} • <span style="background: ${o.payment_method.includes('Paid') ? '#dcfce7; color: #166534' : '#fee2e2; color: #991b1b'}; padding: 2px 6px; border-radius: 4px;">${o.payment_method}</span></div>
+                                    <div style="background:#f8fafc; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--primary);">
+                                        <div style="font-weight: 700; color: #0f172a; font-size: 13px;">Pickup From: <span style="color:var(--primary)">Main Pharmacy Store</span></div>
+                                    </div>
+                                    <div class="order-address" style="margin-bottom: 5px;"><ion-icon name="location" style="color:#ef4444;"></ion-icon> Deliver To: ${o.full_address || 'Customer Location'}</div>
+                                    <div class="order-contact"><ion-icon name="person"></ion-icon> ${o.customer_name} • <ion-icon name="call"></ion-icon> ${o.customer_phone || 'N/A'}</div>
+                                </div>
+                                <div class="action-btns">
+                                    <button class="btn btn-primary" onclick="acceptOrder(${o.id})"><ion-icon name="checkmark-circle"></ion-icon> Accept Route</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:50px; background:white; border-radius:20px; border: 1px dashed #cbd5e1;">
+                            <ion-icon name="cafe" style="font-size:48px; color:#cbd5e1; margin-bottom:15px;"></ion-icon>
+                            <h3 style="margin:0 0 10px 0; color:#334155;">No Orders in Pool</h3>
+                            <p style="color:#64748b; margin:0;">Waiting for new user orders to come in...</p>
+                        </div>
+                    `;
+                }
+            } catch (e) { container.innerHTML = '<p style="color:red;">Failed to connect to Server.</p>'; }
+        }
+
+        async function acceptOrder(id) {
+            try {
+                const res = await fetch(`${API_BASE}/api/delivery/accept/${id}`, {
+                    method: 'POST', headers: getAuthHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast("Order Accepted!");
+                    loadPool();
+                    // Switch to deliveries tab
+                    document.querySelectorAll('.nav-item')[1].click(); 
+                } else { showToast(data.message, "error"); }
+            } catch(e) { showToast("Network Error", "error"); }
+        }
+
+        function switchTab(tabId, el) {
+            document.querySelectorAll('.tab-panel').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(m => m.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            el.classList.add('active');
+
+            if (tabId === 'pool') loadPool();
+            if (tabId === 'deliveries') loadDeliveries();
+            if (tabId === 'earnings') loadEarnings();
+        }
+
+        function toggleMap(id) {
+            const mapEl = document.getElementById(`map-${id}`);
+            if (mapEl.style.display === 'block') {
+                mapEl.style.display = 'none';
+            } else {
+                mapEl.style.display = 'block';
+                showToast("Opening Navigation...");
+                if (!mapEl.hasChildNodes()) {
+                    const lat = 17.385 + (Math.random() - 0.5) * 0.1;
+                    const lng = 78.486 + (Math.random() - 0.5) * 0.1;
+                    const map = L.map(`map-${id}`).setView([lat, lng], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    L.marker([lat, lng]).addTo(map).bindPopup('Customer Location').openPopup();
+                }
+            }
+        }
+
+        // Init Setup
+        window.socket = io(window.APP_CONFIG ? window.APP_CONFIG.SOCKET_URL : API_BASE);
+        window.socket.on('new_order_pool', () => {
+            showToast("New order available in the pool!", "info");
+            if (document.getElementById('tab-pool').classList.contains('active')) loadPool();
+        });
+
+        window.socket.on('new_delivery', (data) => {
+            if (data.agentId == currentUser.userId) {
+                showToast(`🚀 New Delivery Assigned to YOU!`, "success");
+                loadDeliveries();
+                // Switch to deliveries tab if they want
+                if (!document.getElementById('tab-deliveries').classList.contains('active')) {
+                     // show notification/prompt?
+                }
+            }
+        });
+
+        loadPool();
+        loadAgentProfile();
+
+        // Auto refresh deliveries every 10 seconds for real-time feel
+        setInterval(() => {
+            if (document.getElementById('tab-deliveries').classList.contains('active')) {
+                loadDeliveries();
+            }
+        }, 10000);
+    </script>
+    <script src="chatWidget.js"></script>
+    <script>
+        // Init chat with delivery agent context
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.injectChatWidget) injectChatWidget('delivery');
+        });
+    </script>
+</body>
+
+</html>
