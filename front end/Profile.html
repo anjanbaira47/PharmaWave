@@ -273,7 +273,7 @@
 
     <header class="header">
         <div class="logo">
-            <a href="Front.html" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
+            <a href="index.html" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
                 <svg width="40" height="40" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg"
                     style="overflow: visible; filter: drop-shadow(0 4px 6px rgba(16,185,129,0.3));">
                     <defs>
@@ -294,7 +294,7 @@
         </div>
         <div class="navigation">
             <ul>
-                <li><a href="Front.html#catalog">Medicines</a></li>
+                <li><a href="index.html#catalog">Medicines</a></li>
                 <li><a href="#">Locations</a></li>
                 <li><a href="#">24/7 Support</a></li>
                 <li><a href="#" class="nav-btn"
@@ -358,7 +358,7 @@
 
                 <div class="menu-item" onclick="switchTab('settings')"><ion-icon name="settings"></ion-icon>Settings
                 </div>
-                <div class="menu-item" onclick="window.location.href='Front.html#ai-pharmacist'"><ion-icon name="chatbox-ellipses"></ion-icon>AI Pharmacist</div>
+                <div class="menu-item" onclick="window.location.href='index.html#ai-pharmacist'"><ion-icon name="chatbox-ellipses"></ion-icon>AI Pharmacist</div>
                 <div class="menu-item" onclick="logout()" style="color: #ef4444; margin-top: 20px;"><ion-icon
                         name="log-out"></ion-icon>Log Out</div>
             </div>
@@ -850,7 +850,7 @@
 
         function confirmLogout() {
             localStorage.removeItem('pharmaUser');
-            window.location.href = "Front.html";
+            window.location.href = "index.html";
         }
 
         // ==========================================
@@ -1036,7 +1036,7 @@
                             <ion-icon name="basket-outline" style="font-size: 70px; color: var(--border-dark);"></ion-icon>
                             <p style="color: var(--text-main); font-weight: 800; font-size: 20px; margin-top: 15px;">You haven't placed any orders yet.</p>
                             <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 25px;">Let's get healthy today.</p>
-                            <a href="Front.html#catalog" style="background: var(--primary); color: white; padding: 12px 24px; border-radius: 50px; font-weight: 700; text-decoration: none; box-shadow: var(--shadow-sm); display: inline-block; transition: all 0.2s;">Browse Medicines</a>
+                            <a href="index.html#catalog" style="background: var(--primary); color: white; padding: 12px 24px; border-radius: 50px; font-weight: 700; text-decoration: none; box-shadow: var(--shadow-sm); display: inline-block; transition: all 0.2s;">Browse Medicines</a>
                         </div>
                     `;
                 }

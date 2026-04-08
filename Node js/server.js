@@ -68,9 +68,9 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, "../front end")));
 
-// Provide default route to Front.html
+// Provide default route to index.html
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "../front end", "Front.html"));
+    res.sendFile(path.join(__dirname, "../front end", "index.html"));
 });
 
 let pool;
