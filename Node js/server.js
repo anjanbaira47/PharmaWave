@@ -89,6 +89,10 @@ let pool;
 
 async function initDB() {
     try {
+        // Diagnostic: Log available database environment variable names (not their values)
+        const dbKeys = Object.keys(process.env).filter(key => key.includes('DB') || key.includes('MYSQL') || key.includes('URL'));
+        console.log("Detected DB-related env vars:", dbKeys.join(", "));
+
         const dbUrl = process.env.DATABASE_URL || process.env.DB_URL;
         const dbHost = process.env.DB_HOST;
 
@@ -98,6 +102,7 @@ async function initDB() {
             pool = mysql.createPool(connectionString);
             console.log("Connected to MySQL pool via Connection String");
         } else {
+            console.log("DATABASE_URL not found. Falling back to individual variables.");
             pool = mysql.createPool({
                 host: dbHost || "localhost",
                 user: process.env.DB_USER || "root",
