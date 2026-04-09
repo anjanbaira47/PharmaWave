@@ -156,7 +156,14 @@ async function initDB() {
             const adminPassword = await bcrypt.hash('admin123', 10);
             const deliveryPassword = await bcrypt.hash('agent123', 10);
             const pharmacyPassword = await bcrypt.hash('pharmacy123', 10);
-            const values = [['admin', 'admin@pharmawave.com', adminPassword, 'admin', '1234567890'], ['agent1', 'agent@pharmawave.com', deliveryPassword, 'delivery', '0987654321'], ['pharmacy1', 'contact@citymedical.com', pharmacyPassword, 'pharmacy', '9998887776']];
+            const userPassword = await bcrypt.hash('user123', 10);
+            
+            const values = [
+                ['admin', 'admin@pharmawave.com', adminPassword, 'admin', '1234567890'], 
+                ['agent1', 'agent@pharmawave.com', deliveryPassword, 'delivery', '0987654321'], 
+                ['pharmacy1', 'contact@citymedical.com', pharmacyPassword, 'pharmacy', '9998887776'],
+                ['Test User', 'user@gmail.com', userPassword, 'user', '8887776665']
+            ];
             await pool.query(`INSERT INTO users (username, email, password, role, contact) VALUES ?`, [values]);
             console.log("Mock users created.");
         }
