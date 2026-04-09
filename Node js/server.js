@@ -223,9 +223,17 @@ function authenticateToken(req, res, next) {
 app.post("/api/auth/google", async (req, res) => {
     try {
         const { token, role } = req.body;
+        
+        // Support multiple audiences (The one from the code and the one from Firebase)
+        const audiences = [
+            process.env.GOOGLE_CLIENT_ID,
+            '111780913791-qnn4b2m4ir2243m77dicnbbktf6nutkt.apps.googleusercontent.com',
+            '528351606474-e6cde01d2545aa7b236633.apps.googleusercontent.com' // Potential Firebase audience
+        ].filter(Boolean);
+
         const ticket = await googleClient.verifyIdToken({
             idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID || '111780913791-qnn4b2m4ir2243m77dicnbbktf6nutkt.apps.googleusercontent.com'
+            audience: audiences
         });
         const payload = ticket.getPayload();
         const email = payload.email;
@@ -268,7 +276,7 @@ app.post("/api/auth/google", async (req, res) => {
         });
     } catch (err) {
         console.error("Google Auth Error details:", err);
-        const decoded = jwt.decode(token);
+        const decoded = jwt.decode(req.body ? req.body.token : null);
         const detectedAud = decoded ? decoded.aud : "none";
         res.status(500).json({ 
             success: false, 
