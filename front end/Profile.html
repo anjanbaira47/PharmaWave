@@ -329,6 +329,9 @@
             </div>
 
             <div class="sidebar-menu">
+                <div class="menu-item" onclick="logout()" style="color: #ef4444; background: rgba(239, 68, 68, 0.05); border: 1px dashed rgba(239, 68, 68, 0.2); margin-bottom: 20px;">
+                    <ion-icon name="log-out"></ion-icon> <strong>Log Out Now</strong>
+                </div>
                 <div class="menu-item active" onclick="switchTab('profile')"><ion-icon name="person"></ion-icon>Profile
                     Details</div>
                 <div class="menu-item" onclick="switchTab('addresses')">
@@ -359,8 +362,6 @@
                 <div class="menu-item" onclick="switchTab('settings')"><ion-icon name="settings"></ion-icon>Settings
                 </div>
                 <div class="menu-item" onclick="window.location.href='index.html#ai-pharmacist'"><ion-icon name="chatbox-ellipses"></ion-icon>AI Pharmacist</div>
-                <div class="menu-item" onclick="logout()" style="color: #ef4444; margin-top: 20px;"><ion-icon
-                        name="log-out"></ion-icon>Log Out</div>
             </div>
         </div>
 
@@ -630,6 +631,16 @@
 
         function showToast(message, type = "success") {
             toast.textContent = message; toast.className = "show " + type;
+            
+            // AUTO-FIX: If token is invalid, force logout after 2 seconds
+            if (message.includes("Invalid Token")) {
+                setTimeout(() => {
+                    console.log("Auto-clearing invalid session...");
+                    localStorage.removeItem('pharmaUser');
+                    window.location.href = "DirectLogin.html?error=expired";
+                }, 2000);
+            }
+
             setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
         }
 
