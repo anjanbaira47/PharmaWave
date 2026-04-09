@@ -146,6 +146,7 @@ async function initDB() {
         try { await pool.query(`ALTER TABLE orders ADD COLUMN delivery_rating INT DEFAULT NULL`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN lat DECIMAL(10, 8)`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN lng DECIMAL(11, 8)`); } catch (e) { }
+        try { await pool.query("ALTER TABLE users ADD COLUMN cart_data LONGTEXT"); } catch (e) { }
 
         console.log("Database tables initialized successfully.");
 
@@ -381,7 +382,12 @@ app.post("/register", async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        res.json({ success: true, message: "User registered successfully!", token: token });
+        res.json({ 
+            success: true, 
+            message: "User registered successfully!", 
+            userId: newUser[0].id,
+            token: token 
+        });
     } catch (err) {
         if (err.code === "ER_DUP_ENTRY") {
             return res.status(400).json({ success: false, message: "Username or email already exists" });
@@ -439,7 +445,7 @@ app.post("/login", async (req, res) => {
                 res.json({ success: false, message: "Invalid username or password" });
             }
         } else {
-            res.json({ success: false, message: "Invalid username or password" });
+            res.json({ success: false, message: "No account found for this user. Please Sign Up first!" });
         }
     } catch (err) {
         console.error(err);
@@ -744,7 +750,9 @@ app.post("/api/user/:id/username", authenticateToken, async (req, res) => {
 app.get("/api/user/:id/addresses", authenticateToken, async (req, res) => {
     try {
         const userId = req.params.id;
-        if (req.user.id != userId && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Unauthorized" });
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
         const [rows] = await pool.query("SELECT * FROM addresses WHERE user_id = ?", [userId]);
         res.json({ success: true, addresses: rows });
     } catch (err) {
@@ -757,7 +765,9 @@ app.get("/api/user/:id/addresses", authenticateToken, async (req, res) => {
 app.post("/api/user/:id/addresses", authenticateToken, async (req, res) => {
     try {
         const userId = req.params.id;
-        if (req.user.id != userId && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Unauthorized" });
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
         const { title, full_address, is_default } = req.body;
 
         if (!title || !full_address) {
@@ -799,7 +809,9 @@ app.delete("/api/user/:id/addresses/:addressId", authenticateToken, async (req, 
 // Get User Prescriptions
 app.get("/api/user/:id/prescriptions", authenticateToken, async (req, res) => {
     try {
-        if (req.user.id != req.params.id && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Unauthorized" });
+        if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
         const [rows] = await pool.query("SELECT * FROM prescriptions WHERE user_id = ? ORDER BY uploaded_at DESC", [req.params.id]);
         res.json({ success: true, prescriptions: rows });
     } catch (err) {
@@ -811,7 +823,9 @@ app.get("/api/user/:id/prescriptions", authenticateToken, async (req, res) => {
 // Upload Prescription (Base64)
 app.post("/api/user/:id/prescriptions", authenticateToken, async (req, res) => {
     try {
-        if (req.user.id != req.params.id) return res.status(403).json({ success: false, message: "Unauthorized" });
+        if (String(req.user.id) !== String(req.params.id)) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
         const { imageData } = req.body;
         if (!imageData) return res.status(400).json({ success: false, message: "No image data provided" });
 
@@ -1488,6 +1502,45 @@ app.get("/api/ai/substitute/:name", async (req, res) => {
     } catch (err) {
         console.error("AI substitute failed:", err);
         res.status(500).send({ message: "Server error finding substitutes." });
+    }
+});
+
+// ==========================================
+// 🛒 CART PERSISTENCE APIs
+// ==========================================
+
+// Get User Cart
+app.get("/api/user/:id/cart", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        if (req.user.id != userId && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        const [rows] = await pool.query("SELECT cart_data FROM users WHERE id = ?", [userId]);
+        if (rows.length > 0) {
+            res.json({ success: true, cart: rows[0].cart_data ? JSON.parse(rows[0].cart_data) : [] });
+        } else {
+            res.status(404).json({ success: false, message: "User not found" });
+        }
+    } catch (err) {
+        console.error("Fetch cart failed:", err);
+        res.status(500).send({ message: "Server error fetching cart" });
+    }
+});
+
+// Save User Cart
+app.post("/api/user/:id/cart", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        if (req.user.id != userId && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        const { cart } = req.body;
+        await pool.query("UPDATE users SET cart_data = ? WHERE id = ?", [JSON.stringify(cart), userId]);
+        res.json({ success: true, message: "Cart saved successfully!" });
+    } catch (err) {
+        console.error("Save cart failed:", err);
+        res.status(500).send({ message: "Server error saving cart" });
     }
 });
 

@@ -41,6 +41,25 @@
                     role: 'user',
                     token: await user.getIdToken()
                 }));
+
+                // SYNC WITH BACKEND
+                const idToken = await user.getIdToken();
+                const res = await fetch(`${API_BASE}/api/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: idToken })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('pharmaUser', JSON.stringify({
+                        userId: data.userId,
+                        username: data.username,
+                        profile_pic: data.profile_pic,
+                        email: user.email,
+                        role: data.role,
+                        token: data.token // Switch to Backend JWT for API calls
+                    }));
+                }
                 const toast = document.getElementById('toast');
                 toast.textContent = 'Google Sign Up Successful! Redirecting...';
                 toast.className = 'show success';
@@ -216,6 +235,7 @@
 
                     if (res.ok && data.success) {
                         localStorage.setItem('pharmaUser', JSON.stringify({
+                            userId: data.userId,
                             username: username,
                             role: 'user',
                             token: data.token

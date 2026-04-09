@@ -115,6 +115,12 @@
             <ion-icon name="cart"></ion-icon>
             <div class="cart-count" id="cartCount">0</div>
         </div>
+        <!-- AI Floating Chat Assistant -->
+        <div class="action-btn" id="aiChatBtn"
+            style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); border:none; color:white;"
+            onclick="toggleAIChat()">
+            <ion-icon name="chatbubbles"></ion-icon>
+        </div>
         <div class="action-btn chat-btn" id="supportChatBtn"
             onclick="openSupportChat()">
             <ion-icon name="chatbubble-ellipses"></ion-icon>
@@ -217,12 +223,6 @@
         </div>
     </div>
 
-    <!-- AI Floating Chat Assistant -->
-    <div id="aiChatBtn"
-        style="position:fixed; bottom:30px; right:30px; width:60px; height:60px; background:linear-gradient(135deg, #8b5cf6, #3b82f6); border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:30px; box-shadow:0 10px 25px rgba(139, 92, 246, 0.4); cursor:pointer; z-index:100; transition:transform 0.2s;"
-        onclick="toggleAIChat()">
-        <ion-icon name="chatbubbles"></ion-icon>
-    </div>
 
     <div id="aiChatWindow"
         style="display:none; position:fixed; bottom:100px; right:30px; width:350px; background:white; border-radius:20px; box-shadow:0 15px 35px rgba(0,0,0,0.15); z-index:100; flex-direction:column; overflow:hidden; border:1px solid #e2e8f0;">
@@ -326,6 +326,50 @@
                 authBtn.style.gap = '8px';
 
                 await fetchUserAddresses();
+                await fetchCartFromServer();
+            }
+        }
+
+        // --- NEW: CART SERVER SYNC ---
+        async function fetchCartFromServer() {
+            if (!currentUser) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/cart`, {
+                    headers: { 'Authorization': `Bearer ${currentUser.token || ''}` }
+                });
+                const data = await res.json();
+                if (data.success && data.cart) {
+                    // If local cart is empty, take server cart. Otherwise merge.
+                    if (cart.length === 0) {
+                        cart = data.cart;
+                    } else {
+                        data.cart.forEach(serverItem => {
+                            const localItemIdx = cart.findIndex(i => i.id === serverItem.id);
+                            if (localItemIdx === -1) {
+                                cart.push(serverItem);
+                            }
+                        });
+                    }
+                    updateCartUI();
+                }
+            } catch (e) {
+                console.error("Failed to fetch cart from server", e);
+            }
+        }
+
+        async function persistCartToServer() {
+            if (!currentUser) return;
+            try {
+                await fetch(`${API_BASE}/api/user/${currentUser.userId}/cart`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token || ''}`
+                    },
+                    body: JSON.stringify({ cart })
+                });
+            } catch (e) {
+                console.error("Failed to save cart to server", e);
             }
         }
 
@@ -537,6 +581,11 @@
             const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             cartTotalAmount.textContent = total.toFixed(2);
             localStorage.setItem('pharmaCart', JSON.stringify(cart));
+            
+            // Sync with backend if logged in
+            if (currentUser) {
+                persistCartToServer();
+            }
 
             // Render Items
             if (cart.length === 0) {
