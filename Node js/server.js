@@ -25,8 +25,6 @@ const emailTransporter = nodemailer.createTransport({
     }
 });
 
-// Initialize Stripe with secret key
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -1281,77 +1279,6 @@ app.get("/api/orders/:id", authenticateToken, async (req, res) => {
     }
 });
 
-// ==========================================
-// STRIPE PAYMENT API
-// ==========================================
-app.post("/api/payment/create-checkout-session", authenticateToken, async (req, res) => {
-    try {
-        const { orderId } = req.body;
-
-        // 1. Fetch Order
-        const [orders] = await pool.query("SELECT * FROM orders WHERE id = ?", [orderId]);
-        if (orders.length === 0) return res.status(404).json({ success: false, message: "Order not found" });
-        const order = orders[0];
-
-        if (order.user_id !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ success: false, message: "Unauthorized payment attempt" });
-        }
-
-        // 2. Fetch Order Items for line_items
-        const [items] = await pool.query(`
-            SELECT oi.quantity, oi.price, p.name 
-            FROM order_items oi 
-            JOIN products p ON oi.product_id = p.id 
-            WHERE oi.order_id = ?
-        `, [orderId]);
-
-        const lineItems = items.map(item => ({
-            price_data: {
-                currency: 'inr',
-                product_data: {
-                    name: item.name,
-                },
-                unit_amount: Math.round(item.price * 100), // Stripe expects amounts in cents/paise
-            },
-            quantity: item.quantity,
-        }));
-
-        // 3. Create Stripe Checkout Session
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: lineItems,
-            mode: 'payment',
-            client_reference_id: orderId.toString(),
-            success_url: `http://localhost:5500/front%20end/Profile.html?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`, // Adjust port if necessary based on live server
-            cancel_url: `http://localhost:5500/front%20end/Profile.html?payment=failed`,
-        });
-
-        res.json({ success: true, id: session.id, url: session.url });
-    } catch (err) {
-        console.error("Stripe Checkout Error:", err);
-        res.status(500).json({ success: false, message: "Failed to create payment session" });
-    }
-});
-
-// Update Order Payment Status Success Check
-app.post("/api/payment/success", authenticateToken, async (req, res) => {
-    try {
-        const { orderId, sessionId } = req.body;
-
-        // Verify session with Stripe
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-        if (session.payment_status === 'paid') {
-            await pool.query("UPDATE orders SET status = 'Preparing', payment_method = 'Online (Paid)' WHERE id = ?", [orderId]);
-            res.json({ success: true, message: "Payment verified and order updated!" });
-        } else {
-            res.status(400).json({ success: false, message: "Payment not completed" });
-        }
-    } catch (err) {
-        console.error("Payment verify error:", err);
-        res.status(500).json({ success: false, message: "Verification failed" });
-    }
-});
 
 // ==========================================
 // USER PROFILE APIscription

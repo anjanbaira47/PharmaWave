@@ -201,11 +201,6 @@
                     </label>
                     <label
                         style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
-                        <input type="radio" name="paymentMethod" value="UPI" style="accent-color: var(--primary);"> UPI
-                        / Card
-                    </label>
-                    <label
-                        style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
                         <input type="radio" name="paymentMethod" value="Wallet" style="accent-color: var(--primary);">
                         Wallet
                     </label>
@@ -611,32 +606,6 @@
                 const data = await response.json();
 
                 if (data.success) {
-
-                    // Trigger Stripe Checkout if Online Payment
-                    if (paymentMethod === 'UPI') {
-                        showToast(`Redirecting to Secure Payment Gateway...`, "success");
-                        const stripeRes = await fetch(`${API_BASE}/api/payment/create-checkout-session`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${currentUser.token || ''}`
-                            },
-                            body: JSON.stringify({ orderId: data.orderId })
-                        });
-
-                        const stripeData = await stripeRes.json();
-
-                        // Clear cart proactively since we are redirecting
-                        cart = [];
-                        updateCartUI();
-
-                        if (stripeData.success && stripeData.url) {
-                            window.location.href = stripeData.url;
-                            return; // Stop execution, browser navigating away
-                        } else {
-                            showToast("Payment initialization failed: " + stripeData.message, "error");
-                        }
-                    }
 
                     // For COD / Wallet
                     if (isSubscribed) {
