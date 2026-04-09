@@ -89,12 +89,17 @@ let pool;
 
 async function initDB() {
     try {
-        if (process.env.DATABASE_URL) {
-            pool = mysql.createPool(process.env.DATABASE_URL);
-            console.log("Connected to MySQL pool via DATABASE_URL");
+        const dbUrl = process.env.DATABASE_URL || process.env.DB_URL;
+        const dbHost = process.env.DB_HOST;
+
+        // If a full connection string is provided in DATABASE_URL, DB_URL, or even DB_HOST
+        if (dbUrl || (dbHost && dbHost.startsWith('mysql://'))) {
+            const connectionString = dbUrl || dbHost;
+            pool = mysql.createPool(connectionString);
+            console.log("Connected to MySQL pool via Connection String");
         } else {
             pool = mysql.createPool({
-                host: process.env.DB_HOST || "localhost",
+                host: dbHost || "localhost",
                 user: process.env.DB_USER || "root",
                 password: process.env.DB_PASSWORD || "anjanbaira09@db",
                 database: process.env.DB_NAME || "pharma",
