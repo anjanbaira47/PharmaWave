@@ -272,7 +272,10 @@ async function initDB() {
 
         // Insert initial mock products if empty
         const [rows] = await pool.query("SELECT COUNT(*) AS count FROM products");
+        console.log("Current product count:", rows[0].count);
+        
         if (rows[0].count === 0) {
+            console.log("Seeding mock products...");
             const mockProducts = [
                 ["Paracetamol 500mg", "Pain Relief", 5.99, "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", "Effective for pain relief and fever reducing."],
                 ["Vitamin C Supplement", "Vitamins", 12.50, "https://images.unsplash.com/photo-1550572017-edb9cf1209b6?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3", "Boosts immune system."],
@@ -291,7 +294,7 @@ async function initDB() {
             ];
             const insertQuery = "INSERT INTO products (name, category, price, image_url, description) VALUES ?";
             await pool.query(insertQuery, [mockProducts]);
-            console.log("Mock products inserted.");
+            console.log("Mock products inserted successfully.");
         }
 
     } catch (err) {
