@@ -227,9 +227,8 @@ app.post("/api/auth/google", async (req, res) => {
         // Support multiple audiences (The one from the code and the one from Firebase)
         const audiences = [
             process.env.GOOGLE_CLIENT_ID,
-            '111780913791-qnn4b2m4ir2243m77dicnbbktf6nutkt.apps.googleusercontent.com',
-            'pro-pharma-wave', // Firebase Project ID
-            '528351606474-e6cde01d2545aa7b236633.apps.googleusercontent.com' // Potential Firebase audience
+            '528351606474-fd3vem1np095i69ivpli62jefr5rfc61.apps.googleusercontent.com', // Corrected Client ID from user screenshot
+            '111780913791-qnn4b2m4ir2243m77dicnbbktf6nutkt.apps.googleusercontent.com' // Keeping legacy just in case
         ].filter(Boolean);
 
         const ticket = await googleClient.verifyIdToken({
@@ -279,8 +278,7 @@ app.post("/api/auth/google", async (req, res) => {
         console.error("Google Auth Error details:", err);
         const decoded = jwt.decode(req.body ? req.body.token : null);
         const detectedAud = decoded ? decoded.aud : "none";
-        // Use 200 status but success:false to prevent Render/Cloudflare from replacing JSON with HTML error pages
-        res.json({ 
+        res.status(500).json({ 
             success: false, 
             message: `Google Authentication failed: ${err.message}. (Token Audience: ${detectedAud})` 
         });
