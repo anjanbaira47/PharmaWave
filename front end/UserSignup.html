@@ -242,10 +242,10 @@
                             role: 'user',
                             token: data.token
                         }));
-                        showToast("Welcome! Account created! You can now log in with your credentials.", "success");
+                        showToast("Welcome! Account created successfully!", "success");
                         submitBtn.style.background = "var(--primary)";
                         submitBtn.value = "Success!";
-                        setTimeout(() => window.location.href = "DirectLogin.html", 2500);
+                        setTimeout(() => window.location.href = "index.html", 2500);
                     } else {
                         showToast(data.message || "Registration failed", "error");
                         submitBtn.disabled = false;
