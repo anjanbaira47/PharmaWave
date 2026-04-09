@@ -268,7 +268,8 @@ app.post("/api/auth/google", async (req, res) => {
         });
     } catch (err) {
         console.error("Google Auth Error:", err);
-        res.status(500).json({ success: false, message: "Google Authentication failed" });
+        // Include the actual error message to help diagnose the mismatch
+        res.status(500).json({ success: false, message: "Google Authentication failed: " + err.message });
     }
 });
 
