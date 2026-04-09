@@ -28,7 +28,7 @@
         window._pharmaFirebaseAuth = auth;
         window.handleFirebaseGoogleSignup = async function() {
             const btn = document.getElementById('googleSignupBtn');
-            btn.textContent = 'Signing in...';
+            btn.textContent = 'Signing up...';
             btn.disabled = true;
             try {
                 const result = await signInWithPopup(auth, provider);
@@ -39,42 +39,68 @@
                 if (!googleIdToken) {
                     throw new Error("Could not retrieve Google ID Token from authentication result.");
                 }
-                localStorage.setItem('pharmaUser', JSON.stringify({
-                    userId: user.uid,
-                    username: user.displayName || user.email.split('@')[0],
-                    profile_pic: user.photoURL,
-                    email: user.email,
-                    role: 'user',
-                    token: await user.getIdToken()
-                }));
 
-                // SYNC WITH BACKEND
-                const res = await fetch(`${API_BASE}/api/auth/google`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: googleIdToken })
+                // Extract username from email (part before @)
+                const username = user.displayName || user.email.split('@')[0];
+                // Generate a random secure password for Google users
+                const randomPassword = 'google_' + Math.random().toString(36).slice(2, 15);
+                const email = user.email;
+
+                // FIRST: Register in backend database
+                const registerRes = await fetch(`${API_BASE}/register`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        username: username, 
+                        contact: email, 
+                        password: randomPassword 
+                    })
                 });
-                const data = await res.json();
-                if (data.success) {
+                const registerData = await registerRes.json();
+
+                if (!registerRes.ok || !registerData.success) {
+                    // Check if user already exists
+                    if (registerData.message && registerData.message.includes('already exists')) {
+                        // User exists, proceed to login
+                        const toast = document.getElementById('toast');
+                        toast.textContent = 'Account already exists! Logging you in...';
+                        toast.className = 'show success';
+                        // Sync with Google backend
+                        const syncRes = await fetch(`${API_BASE}/api/auth/google`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ token: googleIdToken })
+                        });
+                        const syncData = await syncRes.json();
+                        if (syncData.success) {
+                            localStorage.setItem('pharmaUser', JSON.stringify({
+                                userId: syncData.userId,
+                                username: syncData.username,
+                                profile_pic: syncData.profile_pic,
+                                email: email,
+                                role: syncData.role,
+                                token: syncData.token
+                            }));
+                            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                        }
+                    } else {
+                        throw new Error(registerData.message || 'Registration failed');
+                    }
+                } else {
+                    // Account created successfully
                     localStorage.setItem('pharmaUser', JSON.stringify({
-                        userId: data.userId,
-                        username: data.username,
-                        profile_pic: data.profile_pic,
-                        email: user.email,
-                        role: data.role,
-                        token: data.token // Switch to Backend JWT for API calls
+                        userId: registerData.userId,
+                        username: username,
+                        profile_pic: user.photoURL,
+                        email: email,
+                        role: 'user',
+                        token: registerData.token
                     }));
                     
                     const toast = document.getElementById('toast');
                     toast.textContent = 'Google Sign Up Successful! Redirecting...';
                     toast.className = 'show success';
                     setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-                } else {
-                    const toast = document.getElementById('toast');
-                    toast.textContent = 'Backend Sync Failed: ' + (data.message || 'Unknown error');
-                    toast.className = 'show error';
-                    btn.textContent = 'Sign up with Google';
-                    btn.disabled = false;
                 }
             } catch(err) {
                 const toast = document.getElementById('toast');
