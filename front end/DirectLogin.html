@@ -128,7 +128,7 @@
             </div>
 
             <div class="input-box">
-                <input type="email" id="emailInput" class="input-field" placeholder="Google Email Address">
+                <input type="text" id="emailInput" class="input-field" placeholder="Email or Username">
             </div>
             <div class="input-box">
                 <input type="password" id="password" class="input-field" placeholder="Password">
@@ -197,16 +197,15 @@
                 return;
             }
 
-            // Validation: Google Mail, pharmawave.com, citymedical.com, Mobile, or 'admin'
-            const emailLower = email.toLowerCase();
-            const isGmail = emailLower.endsWith('@gmail.com');
-            const isPharma = emailLower.endsWith('@pharmawave.com');
-            const isPartner = emailLower.endsWith('@citymedical.com');
-            const isMobile = /^[6-9]\d{9}$/.test(email);
-            const isAdmin = emailLower === 'admin';
+            // Validation: Accept email, mobile, or username
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const mobileRegex = /^[6-9]\d{9}$/;
+            const isValidEmail = emailRegex.test(email);
+            const isValidMobile = mobileRegex.test(email);
+            const isUsername = email.length > 0 && email.trim(); // Username must not be empty
 
-            if (!isGmail && !isPharma && !isPartner && !isMobile && !isAdmin) {
-                showToast("Please enter a valid Google Mail (@gmail.com), Mobile Number, or Authorized ID.", "error");
+            if (!isValidEmail && !isValidMobile && !isUsername) {
+                showToast("Please enter a valid email, mobile number, or username.", "error");
                 return;
             }
 

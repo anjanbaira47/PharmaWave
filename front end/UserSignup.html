@@ -212,32 +212,7 @@
                 submitBtn.value = "Creating account...";
 
                 try {
-                    // Only register in Firebase if it's an email (not mobile)
-                    if (emailRegex.test(contact)) {
-                        // Use global firebaseAuth set by the module script
-                        const { getAuth, createUserWithEmailAndPassword, updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
-                        const auth = window._pharmaFirebaseAuth;
-                        if (auth) {
-                            const userCred = await createUserWithEmailAndPassword(auth, contact, password);
-                            await updateProfile(userCred.user, { displayName: username });
-
-                            localStorage.setItem('pharmaUser', JSON.stringify({
-                                userId: userCred.user.uid,
-                                username: username,
-                                email: contact,
-                                role: 'user',
-                                token: await userCred.user.getIdToken()
-                            }));
-
-                            showToast("Welcome! Account created! Redirecting...", "success");
-                            submitBtn.style.background = "var(--primary)";
-                            submitBtn.value = "Success!";
-                            setTimeout(() => window.location.href = "index.html", 2000);
-                            return;
-                        }
-                    }
-
-                    // Fallback: mobile number registration via backend
+                    // Register in backend database (works for both email and mobile)
                     const res = await fetch(`${API_BASE}/register`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -246,16 +221,31 @@
                     const data = await res.json();
 
                     if (res.ok && data.success) {
+                        // If email, also create Firebase account for future use
+                        if (emailRegex.test(contact)) {
+                            try {
+                                const { createUserWithEmailAndPassword, updateProfile } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+                                const auth = window._pharmaFirebaseAuth;
+                                if (auth) {
+                                    const userCred = await createUserWithEmailAndPassword(auth, contact, password);
+                                    await updateProfile(userCred.user, { displayName: username });
+                                }
+                            } catch (firebaseErr) {
+                                console.log("Firebase registration skipped:", firebaseErr.message);
+                            }
+                        }
+
                         localStorage.setItem('pharmaUser', JSON.stringify({
                             userId: data.userId,
                             username: username,
+                            email: contact,
                             role: 'user',
                             token: data.token
                         }));
-                        showToast("Welcome! Redirecting...", "success");
+                        showToast("Welcome! Account created! You can now log in with your credentials.", "success");
                         submitBtn.style.background = "var(--primary)";
                         submitBtn.value = "Success!";
-                        setTimeout(() => window.location.href = "index.html", 2500);
+                        setTimeout(() => window.location.href = "DirectLogin.html", 2500);
                     } else {
                         showToast(data.message || "Registration failed", "error");
                         submitBtn.disabled = false;
