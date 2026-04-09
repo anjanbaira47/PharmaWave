@@ -228,6 +228,7 @@ app.post("/api/auth/google", async (req, res) => {
         const audiences = [
             process.env.GOOGLE_CLIENT_ID,
             '111780913791-qnn4b2m4ir2243m77dicnbbktf6nutkt.apps.googleusercontent.com',
+            'pro-pharma-wave', // Firebase Project ID
             '528351606474-e6cde01d2545aa7b236633.apps.googleusercontent.com' // Potential Firebase audience
         ].filter(Boolean);
 
@@ -278,7 +279,8 @@ app.post("/api/auth/google", async (req, res) => {
         console.error("Google Auth Error details:", err);
         const decoded = jwt.decode(req.body ? req.body.token : null);
         const detectedAud = decoded ? decoded.aud : "none";
-        res.status(500).json({ 
+        // Use 200 status but success:false to prevent Render/Cloudflare from replacing JSON with HTML error pages
+        res.json({ 
             success: false, 
             message: `Google Authentication failed: ${err.message}. (Token Audience: ${detectedAud})` 
         });
