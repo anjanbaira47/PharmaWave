@@ -39,18 +39,33 @@
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
 
-                // Store in localStorage — role defaults to 'user' for Google sign-ins
-                localStorage.setItem('pharmaUser', JSON.stringify({
-                    userId: user.uid,
-                    username: user.displayName || user.email.split('@')[0],
-                    profile_pic: user.photoURL,
-                    email: user.email,
-                    role: 'user',
-                    token: await user.getIdToken()
-                }));
+                // EXCHANGE FIREBASE TOKEN FOR LOCAL JWT
+                const exchangeRes = await fetch(`${API_BASE}/api/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: user.email,
+                        username: user.displayName,
+                        profile_pic: user.photoURL
+                    })
+                });
 
-                showToast("Google Login Successful! Redirecting...", "success");
-                setTimeout(() => { window.location.href = "index.html"; }, 1500);
+                const authData = await exchangeRes.json();
+
+                if (authData.success) {
+                    localStorage.setItem('pharmaUser', JSON.stringify({
+                        userId: authData.userId,
+                        username: authData.username,
+                        profile_pic: authData.profile_pic,
+                        role: authData.role,
+                        token: authData.token
+                    }));
+
+                    showToast("Google Login Successful! Redirecting...", "success");
+                    setTimeout(() => { window.location.href = "index.html"; }, 1500);
+                } else {
+                    throw new Error(authData.message || "Auth exchange failed");
+                }
 
             } catch (err) {
                 console.error(err);

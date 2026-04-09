@@ -586,6 +586,45 @@ app.post("/api/orders", authenticateToken, async (req, res) => {
     }
 });
 
+// GOOGLE AUTH EXCHANGE
+app.post("/api/auth/google", async (req, res) => {
+    try {
+        const { email, username, profile_pic } = req.body;
+        if (!email) return res.status(400).json({ success: false, message: "Email required" });
+
+        let [users] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+        let user;
+        
+        if (users.length === 0) {
+            // Auto-signup Google users
+            const [result] = await pool.query("INSERT INTO users (username, email, password, role, profile_pic) VALUES (?, ?, 'google-auth', 'user', ?)", 
+                [username || email.split('@')[0], email, profile_pic || null]);
+            
+            const [newUser] = await pool.query("SELECT * FROM users WHERE id = ?", [result.insertId]);
+            user = newUser[0];
+        } else {
+            user = users[0];
+            // Update profile pic if it changed
+            if (profile_pic && user.profile_pic !== profile_pic) {
+                await pool.query("UPDATE users SET profile_pic = ? WHERE id = ?", [profile_pic, user.id]);
+            }
+        }
+
+        const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+        res.json({ 
+            success: true, 
+            token, 
+            userId: user.id, 
+            username: user.username, 
+            role: user.role, 
+            profile_pic: user.profile_pic || profile_pic 
+        });
+    } catch (err) {
+        console.error("Google Auth Exchange Error:", err);
+        res.status(500).json({ success: false, message: "Auth exchange failed" });
+    }
+});
+
 // GET USER ORDERS
 app.get("/api/orders/user/:id", authenticateToken, async (req, res) => {
     try {
