@@ -63,6 +63,20 @@ const upload = multer({ storage: storage });
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+// Database connection guard middleware
+app.use((req, res, next) => {
+    // Check if the pool is initialized for API routes
+    if (req.path.startsWith('/api') || req.path === '/login' || req.path === '/register') {
+        if (!pool) {
+            return res.status(503).json({ 
+                success: false, 
+                message: "Database connection not established. Please ensure DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME are set in Render environment variables." 
+            });
+        }
+    }
+    next();
+});
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, "../front end")));
 
