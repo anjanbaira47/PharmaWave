@@ -38,15 +38,15 @@
             try {
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
+                const idToken = await user.getIdToken();
 
-                // EXCHANGE FIREBASE TOKEN FOR LOCAL JWT
+                // SECURE EXCHANGE: Pass the actual Google Token to the server
                 const exchangeRes = await fetch(`${API_BASE}/api/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email: user.email,
-                        username: user.displayName,
-                        profile_pic: user.photoURL
+                        token: idToken,
+                        role: 'user'
                     })
                 });
 
@@ -64,7 +64,8 @@
                     showToast("Google Login Successful! Redirecting...", "success");
                     setTimeout(() => { window.location.href = "index.html"; }, 1500);
                 } else {
-                    throw new Error(authData.message || "Auth exchange failed");
+                    // Show the "Sign Up First" error clearly
+                    showToast(authData.message || "Login failed", "error");
                 }
 
             } catch (err) {
