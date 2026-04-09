@@ -117,17 +117,18 @@ async function initDB() {
             console.log("Connected to MySQL pool via individual variables");
         }
 
-        // Create Users Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                contact VARCHAR(255)
-            )
-        `);
+        // 1. Create All Tables First
+        await pool.query(`CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, contact VARCHAR(255))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS products (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, category VARCHAR(255), price DECIMAL(10, 2) NOT NULL, image_url VARCHAR(500), description TEXT, stock INT DEFAULT 100, expiry_date DATE)`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS orders (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, total_amount DECIMAL(10, 2) NOT NULL, status VARCHAR(50) DEFAULT 'Pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS addresses (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, title VARCHAR(100) NOT NULL, full_address TEXT NOT NULL, is_default BOOLEAN DEFAULT FALSE, FOREIGN KEY (user_id) REFERENCES users(id))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS order_items (id INT AUTO_INCREMENT PRIMARY KEY, order_id INT, product_id INT, quantity INT NOT NULL, price DECIMAL(10, 2) NOT NULL, FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (product_id) REFERENCES products(id))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS prescriptions (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, image_data LONGTEXT NOT NULL, status VARCHAR(50) DEFAULT 'Pending Review', uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS pharmacies (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, location VARCHAR(255) NOT NULL, contact VARCHAR(255) NOT NULL, status VARCHAR(50) DEFAULT 'Active', joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS user_cards (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, card_title VARCHAR(100), card_number VARCHAR(20), expiry VARCHAR(10), FOREIGN KEY (user_id) REFERENCES users(id))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS consultations (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, doctor_name VARCHAR(255), subject VARCHAR(255), date DATE, time TIME, status VARCHAR(50) DEFAULT 'Booked', FOREIGN KEY (user_id) REFERENCES users(id))`);
 
-        // Ensure new columns exist
+        // 2. Run Migrations / Alterations
         try { await pool.query("ALTER TABLE users ADD COLUMN profile_pic LONGTEXT"); } catch (e) { }
         try { await pool.query("ALTER TABLE users ADD COLUMN email VARCHAR(255)"); } catch (e) { }
         try { await pool.query("ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'user'"); } catch (e) { }
@@ -137,54 +138,7 @@ async function initDB() {
         try { await pool.query("ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)"); } catch (e) { }
         try { await pool.query("ALTER TABLE users ADD COLUMN email_notifications BOOLEAN DEFAULT TRUE"); } catch (e) { }
         try { await pool.query("ALTER TABLE users ADD COLUMN sms_alerts BOOLEAN DEFAULT TRUE"); } catch (e) { }
-
-        // Create default delivery agent if not exists
-        const [usersCount] = await pool.query('SELECT COUNT(*) as count FROM users');
-        if (usersCount[0].count === 0) {
-            const adminPassword = await bcrypt.hash('admin123', 10);
-            const deliveryPassword = await bcrypt.hash('agent123', 10);
-            const pharmacyPassword = await bcrypt.hash('pharmacy123', 10);
-            
-            const values = [
-                ['admin', 'admin@pharmawave.com', adminPassword, 'admin', '1234567890'],
-                ['agent1', 'agent@pharmawave.com', deliveryPassword, 'delivery', '0987654321'],
-                ['pharmacy1', 'contact@citymedical.com', pharmacyPassword, 'pharmacy', '9998887776']
-            ];
-            
-            await pool.query(`INSERT INTO users (username, email, password, role, contact) VALUES ?`, [values]);
-            console.log("Mock users (admin, agent1, pharmacy1) created.");
-        }
-
-// Create Products Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS products (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                category VARCHAR(255),
-                price DECIMAL(10, 2) NOT NULL,
-                image_url VARCHAR(500),
-                description TEXT,
-                stock INT DEFAULT 100,
-                expiry_date DATE
-            )
-        `);
-
-        // Migration: Ensure expiry_date column exists in products table
         try { await pool.query("ALTER TABLE products ADD COLUMN expiry_date DATE"); } catch (e) { }
-
-        // Create Orders Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS orders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT,
-                total_amount DECIMAL(10, 2) NOT NULL,
-                status VARCHAR(50) DEFAULT 'Pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
-
-        // Safely add columns to orders table
         try { await pool.query(`ALTER TABLE orders ADD COLUMN agent_id INT`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN address_id INT`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50) DEFAULT 'COD'`); } catch (e) { }
@@ -193,87 +147,22 @@ async function initDB() {
         try { await pool.query(`ALTER TABLE orders ADD COLUMN lat DECIMAL(10, 8)`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN lng DECIMAL(11, 8)`); } catch (e) { }
 
-        // Create Addresses Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS addresses (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                title VARCHAR(100) NOT NULL,
-                full_address TEXT NOT NULL,
-                is_default BOOLEAN DEFAULT FALSE,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
-
-        // Create Order Items Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS order_items (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                order_id INT,
-                product_id INT,
-                quantity INT NOT NULL,
-                price DECIMAL(10, 2) NOT NULL,
-                FOREIGN KEY (order_id) REFERENCES orders(id),
-                FOREIGN KEY (product_id) REFERENCES products(id)
-            )
-        `);
-
-        // Create Prescriptions Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS prescriptions (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                image_data LONGTEXT NOT NULL,
-                status VARCHAR(50) DEFAULT 'Pending Review',
-                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
-
-        // Create Pharmacies Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS pharmacies (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                location VARCHAR(255) NOT NULL,
-                contact VARCHAR(255) NOT NULL,
-                status VARCHAR(50) DEFAULT 'Active',
-                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // Create User Cards Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS user_cards (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                card_title VARCHAR(100),
-                card_number VARCHAR(20),
-                expiry VARCHAR(10),
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
-
-        // Create Consultations Table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS consultations (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                doctor_name VARCHAR(255),
-                subject VARCHAR(255),
-                date DATE,
-                time TIME,
-                status VARCHAR(50) DEFAULT 'Booked',
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
-
         console.log("Database tables initialized successfully.");
 
-        // Insert initial mock products if empty
+        // 3. Seed Data
+        // Seed Users
+        const [usersCount] = await pool.query('SELECT COUNT(*) as count FROM users');
+        if (usersCount[0].count === 0) {
+            const adminPassword = await bcrypt.hash('admin123', 10);
+            const deliveryPassword = await bcrypt.hash('agent123', 10);
+            const pharmacyPassword = await bcrypt.hash('pharmacy123', 10);
+            const values = [['admin', 'admin@pharmawave.com', adminPassword, 'admin', '1234567890'], ['agent1', 'agent@pharmawave.com', deliveryPassword, 'delivery', '0987654321'], ['pharmacy1', 'contact@citymedical.com', pharmacyPassword, 'pharmacy', '9998887776']];
+            await pool.query(`INSERT INTO users (username, email, password, role, contact) VALUES ?`, [values]);
+            console.log("Mock users created.");
+        }
+
+        // Seed Products
         const [rows] = await pool.query("SELECT COUNT(*) AS count FROM products");
-        console.log("Current product count:", rows[0].count);
-        
         if (rows[0].count === 0) {
             console.log("Seeding mock products...");
             const mockProducts = [
@@ -292,9 +181,8 @@ async function initDB() {
                 ["Antihistamine Tablets", "Allergy", 11.20, "https://plus.unsplash.com/premium_photo-1661630983141-8f4dfbc52bf1?w=500&auto=format&fit=crop&q=60", "Non-drowsy allergy relief."],
                 ["Thermometer Digital", "First Aid", 18.50, "https://images.unsplash.com/photo-1584362917165-526a968579e8?w=500&auto=format&fit=crop&q=60", "Accurate temperature reading in seconds."]
             ];
-            const insertQuery = "INSERT INTO products (name, category, price, image_url, description) VALUES ?";
-            await pool.query(insertQuery, [mockProducts]);
-            console.log("Mock products inserted successfully.");
+            await pool.query("INSERT INTO products (name, category, price, image_url, description) VALUES ?", [mockProducts]);
+            console.log("Mock products inserted.");
         }
 
     } catch (err) {
