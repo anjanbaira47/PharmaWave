@@ -267,9 +267,13 @@ app.post("/api/auth/google", async (req, res) => {
             role: user.role || 'user'
         });
     } catch (err) {
-        console.error("Google Auth Error:", err);
-        // Include the actual error message to help diagnose the mismatch
-        res.status(500).json({ success: false, message: "Google Authentication failed: " + err.message });
+        console.error("Google Auth Error details:", err);
+        const decoded = jwt.decode(token);
+        const detectedAud = decoded ? decoded.aud : "none";
+        res.status(500).json({ 
+            success: false, 
+            message: `Google Authentication failed: ${err.message}. (Token Audience: ${detectedAud})` 
+        });
     }
 });
 

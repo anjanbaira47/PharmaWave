@@ -64,11 +64,18 @@
                         role: data.role,
                         token: data.token // Switch to Backend JWT for API calls
                     }));
+                    
+                    const toast = document.getElementById('toast');
+                    toast.textContent = 'Google Sign Up Successful! Redirecting...';
+                    toast.className = 'show success';
+                    setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                } else {
+                    const toast = document.getElementById('toast');
+                    toast.textContent = 'Backend Sync Failed: ' + (data.message || 'Unknown error');
+                    toast.className = 'show error';
+                    btn.textContent = 'Sign up with Google';
+                    btn.disabled = false;
                 }
-                const toast = document.getElementById('toast');
-                toast.textContent = 'Google Sign Up Successful! Redirecting...';
-                toast.className = 'show success';
-                setTimeout(() => { window.location.href = 'index.html'; }, 1500);
             } catch(err) {
                 const toast = document.getElementById('toast');
                 toast.textContent = 'Google Sign-Up failed: ' + (err.message || 'Unknown error');
