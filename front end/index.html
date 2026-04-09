@@ -305,6 +305,15 @@
             const storedUser = localStorage.getItem('pharmaUser');
             if (storedUser) {
                 currentUser = JSON.parse(storedUser);
+
+                // IMMEDIATE FIX: If this is an old Google login (userId is a string instead of number), purge it!
+                if (currentUser && typeof currentUser.userId === 'string' && currentUser.userId.length > 20) {
+                    console.error("Legacy Google session detected in index. Purging...");
+                    localStorage.removeItem('pharmaUser');
+                    window.location.reload(); // Refresh to clear UI
+                    return;
+                }
+
                 authBtn.innerHTML = `<img src="${currentUser.profile_pic || 'https://via.placeholder.com/150'}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:2px solid var(--primary);"> Profile`;
                 authBtn.href = "Profile.html";
                 authBtn.classList.remove('login');
