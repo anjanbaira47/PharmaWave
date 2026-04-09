@@ -38,14 +38,22 @@
             try {
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
-                const idToken = await user.getIdToken();
+                
+                // CRITICAL: We need the GOOGLE ID TOKEN, not the Firebase ID Token
+                // for the backend's google-auth-library verifyIdToken logic.
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                const googleIdToken = credential.idToken;
+
+                if (!googleIdToken) {
+                    throw new Error("Could not retrieve Google ID Token from authentication result.");
+                }
 
                 // SECURE EXCHANGE: Pass the actual Google Token to the server
                 const exchangeRes = await fetch(`${API_BASE}/api/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        token: idToken,
+                        token: googleIdToken,
                         role: 'user'
                     })
                 });

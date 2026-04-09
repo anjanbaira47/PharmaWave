@@ -33,6 +33,12 @@
             try {
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                const googleIdToken = credential.idToken;
+
+                if (!googleIdToken) {
+                    throw new Error("Could not retrieve Google ID Token from authentication result.");
+                }
                 localStorage.setItem('pharmaUser', JSON.stringify({
                     userId: user.uid,
                     username: user.displayName || user.email.split('@')[0],
@@ -43,11 +49,10 @@
                 }));
 
                 // SYNC WITH BACKEND
-                const idToken = await user.getIdToken();
                 const res = await fetch(`${API_BASE}/api/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: idToken })
+                    body: JSON.stringify({ token: googleIdToken })
                 });
                 const data = await res.json();
                 if (data.success) {
