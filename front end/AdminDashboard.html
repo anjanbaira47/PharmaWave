@@ -350,7 +350,7 @@
                 <ion-icon name="business"></ion-icon> Pharmacies
             </div>
             <div style="flex: 1;"></div>
-            <div class="admin-nav-item" onclick="window.location.href='index.html'"
+            <div class="admin-nav-item" onclick="logout()"
                 style="color: #ef4444; margin-top: auto;">
                 <ion-icon name="log-out"></ion-icon> Exit Portal
             </div>
@@ -681,6 +681,11 @@
         function showToast(message, type = "success") {
             toast.textContent = message; toast.className = "show " + type;
             setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
+        }
+
+        function logout() {
+            localStorage.removeItem('pharmaUser');
+            window.location.href = "index.html";
         }
 
         function switchAdminTab(tabId, el) {
