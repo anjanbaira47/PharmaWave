@@ -11,6 +11,7 @@ const { OAuth2Client } = require("google-auth-library");
 const path = require("path");
 const os = require("os");
 const nodemailer = require("nodemailer");
+const fs = require("fs");
 require("dotenv").config();
 // Support for Render Secret Files
 const secretPath = path.join('/etc/secrets', '.env');
@@ -18,7 +19,6 @@ if (fs.existsSync(secretPath)) {
     require("dotenv").config({ path: secretPath });
     console.log("Loaded additional environment variables from Render Secret File.");
 }
-const fs = require("fs");
 
 // Configure Nodemailer transporter with Gmail SMTP
 const emailTransporter = nodemailer.createTransport({
