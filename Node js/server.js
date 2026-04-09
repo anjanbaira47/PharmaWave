@@ -89,18 +89,22 @@ let pool;
 
 async function initDB() {
     try {
-        pool = mysql.createPool({
-            host: process.env.DB_HOST || "localhost",
-            user: process.env.DB_USER || "root",
-            password: process.env.DB_PASSWORD || "anjanbaira09@db",
-            database: process.env.DB_NAME || "pharma",
-            port: process.env.DB_PORT || 3306,
-            waitForConnections: true,
-            connectionLimit: 10,
-            queueLimit: 0
-        });
-
-        console.log("Connected to MySQL pool");
+        if (process.env.DATABASE_URL) {
+            pool = mysql.createPool(process.env.DATABASE_URL);
+            console.log("Connected to MySQL pool via DATABASE_URL");
+        } else {
+            pool = mysql.createPool({
+                host: process.env.DB_HOST || "localhost",
+                user: process.env.DB_USER || "root",
+                password: process.env.DB_PASSWORD || "anjanbaira09@db",
+                database: process.env.DB_NAME || "pharma",
+                port: process.env.DB_PORT || 3306,
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0
+            });
+            console.log("Connected to MySQL pool via individual variables");
+        }
 
         // Create Users Table
         await pool.query(`
