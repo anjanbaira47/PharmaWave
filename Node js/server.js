@@ -22,9 +22,7 @@ if (fs.existsSync(secretPath)) {
 
 // Configure Nodemailer transporter with Gmail SMTP
 const emailTransporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // Use SSL/TLS
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -934,10 +932,6 @@ app.delete("/api/admin/users/:id", authenticateToken, async (req, res) => {
         await connection.query("DELETE FROM addresses WHERE user_id = ?", [userId]);
         await connection.query("DELETE FROM consultations WHERE user_id = ?", [userId]);
         await connection.query("DELETE FROM user_cards WHERE user_id = ?", [userId]);
-        await connection.query("DELETE FROM login WHERE id = ?", [userId]);
-        if (userEmail) {
-            await connection.query("DELETE FROM usrs WHERE email = ?", [userEmail]);
-        }
         
         // 4. Finally delete the user
         await connection.query("DELETE FROM users WHERE id = ?", [userId]);
