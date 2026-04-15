@@ -335,32 +335,17 @@ app.post("/api/auth/forgot-password", async (req, res) => {
                 `
             };
 
-            // Wrap sendMail in a timeout promise since Render free tier blocks SMTP (ports 465/587)
-            const sendEmailWithTimeout = new Promise(async (resolve, reject) => {
-                const timer = setTimeout(() => {
-                    reject(new Error("SMTP_BLOCKED_BY_RENDER"));
-                }, 4000);
-                
-                try {
-                    await emailTransporter.sendMail(mailOptions);
-                    clearTimeout(timer);
-                    resolve();
-                } catch (e) {
-                    clearTimeout(timer);
-                    reject(e);
-                }
-            });
-
             try {
-                await sendEmailWithTimeout;
+                await emailTransporter.sendMail(mailOptions);
                 console.log(`Password reset OTP sent to ${userEmail}`);
                 res.json({ success: true, message: "OTP sent to your email!" });
             } catch (err) {
-                // Render blocks SMTP. Fallback to showing the OTP so testing can continue
-                console.log(`[RENDER FALLBACK] Password reset OTP for ${userEmail} is ${otpCode}`);
+                console.error(`[SMTP ERROR] Failed to send email to ${userEmail}:`, err);
+                // Fallback to showing the OTP so testing can continue
+                console.log(`[FALLBACK] Password reset OTP for ${userEmail} is ${otpCode}`);
                 res.json({ 
                     success: true, 
-                    message: `OTP generated: ${otpCode} (Email was blocked by Render's firewall)` 
+                    message: `OTP generated: ${otpCode} (Email failed: check server logs)` 
                 });
             }
         } else {

@@ -1,0 +1,5 @@
+Subject: Test from Local
+To: anjanbaira@gmail.com
+From: anjanbaira@gmail.com
+
+This is a test email sent via curl to verify SMTP credentials.
