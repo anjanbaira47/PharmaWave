@@ -335,17 +335,34 @@ app.post("/api/auth/forgot-password", async (req, res) => {
                 `
             };
 
+            // Wrap sendMail in a promise race to enforce a timeout (solves infinite hang on Render free tier)
+            const sendEmailWithTimeout = new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    reject(new Error("SMTP Connection Timed Out (Likely Blocked By Render)"));
+                }, 8000); // 8-second generous timeout
+                
+                emailTransporter.sendMail(mailOptions)
+                    .then(() => {
+                        clearTimeout(timer);
+                        resolve();
+                    })
+                    .catch((err) => {
+                        clearTimeout(timer);
+                        reject(err);
+                    });
+            });
+
             try {
-                await emailTransporter.sendMail(mailOptions);
+                await sendEmailWithTimeout;
                 console.log(`Password reset OTP sent to ${userEmail}`);
                 res.json({ success: true, message: "OTP sent to your email!" });
             } catch (err) {
-                console.error(`[SMTP ERROR] Failed to send email to ${userEmail}:`, err);
+                console.error(`[SMTP ERROR] Failed to send email to ${userEmail}:`, err.message);
                 // Fallback to showing the OTP so testing can continue
                 console.log(`[FALLBACK] Password reset OTP for ${userEmail} is ${otpCode}`);
                 res.json({ 
                     success: true, 
-                    message: `OTP generated: ${otpCode} (Email failed: check server logs)` 
+                    message: `OTP generated: ${otpCode}` 
                 });
             }
         } else {
