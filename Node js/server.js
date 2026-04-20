@@ -12,7 +12,7 @@ const path = require("path");
 const os = require("os");
 const nodemailer = require("nodemailer");
 const fs = require("fs");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, '.env') });
 // Support for Render Secret Files
 const secretPath = path.join('/etc/secrets', '.env');
 if (fs.existsSync(secretPath)) {
@@ -339,7 +339,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
             const sendEmailWithTimeout = new Promise((resolve, reject) => {
                 const timer = setTimeout(() => {
                     reject(new Error("SMTP Connection Timed Out (Likely Blocked By Render)"));
-                }, 8000); // 8-second generous timeout
+                }, 5000); // 5-second timeout for better UX
                 
                 emailTransporter.sendMail(mailOptions)
                     .then(() => {
@@ -362,7 +362,8 @@ app.post("/api/auth/forgot-password", async (req, res) => {
                 console.log(`[FALLBACK] Password reset OTP for ${userEmail} is ${otpCode}`);
                 res.json({ 
                     success: true, 
-                    message: `OTP generated: ${otpCode}` 
+                    message: `OTP generated: ${otpCode}`,
+                    fallbackOtp: otpCode
                 });
             }
         } else {
