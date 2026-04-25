@@ -338,8 +338,8 @@ app.post("/api/auth/forgot-password", async (req, res) => {
             // Wrap sendMail in a promise race to enforce a timeout (solves infinite hang on Render free tier)
             const sendEmailWithTimeout = new Promise((resolve, reject) => {
                 const timer = setTimeout(() => {
-                    reject(new Error("SMTP Connection Timed Out (Likely Blocked By Render)"));
-                }, 5000); // 5-second timeout for better UX
+                    reject(new Error("SMTP Connection Timed Out. If local, your internet might be slow or ISP blocks SMTP."));
+                }, 4000); // 4-second timeout for a better UX when blocked
                 
                 emailTransporter.sendMail(mailOptions)
                     .then(() => {
@@ -378,7 +378,11 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 // RESET PASSWORD API
 app.post("/api/auth/reset-password", async (req, res) => {
     try {
-        const { otp, newPassword } = req.body;
+        let { otp, newPassword } = req.body;
+        
+        if (typeof otp === 'string') {
+            otp = otp.replace(/\s+/g, '').trim();
+        }
 
         if (!otp || !newPassword) return res.status(400).json({ success: false, message: "OTP and new password required" });
 
