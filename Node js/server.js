@@ -378,15 +378,23 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 // RESET PASSWORD API
 app.post("/api/auth/reset-password", async (req, res) => {
     try {
-        let { otp, newPassword } = req.body;
+        let { email, otp, newPassword } = req.body;
         
-        if (typeof otp === 'string') {
-            otp = otp.replace(/\s+/g, '').trim();
+        if (otp !== undefined && otp !== null) {
+            otp = String(otp).replace(/\D/g, '').trim();
         }
 
         if (!otp || !newPassword) return res.status(400).json({ success: false, message: "OTP and new password required" });
 
-        const [rows] = await pool.query("SELECT id FROM users WHERE reset_token = ?", [otp]);
+        let query = "SELECT id FROM users WHERE reset_token = ?";
+        let params = [otp];
+
+        if (email) {
+            query += " AND (email = ? OR username = ?)";
+            params.push(email, email);
+        }
+
+        const [rows] = await pool.query(query, params);
 
         if (rows.length > 0) {
             const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -397,7 +405,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
         }
     } catch (err) {
         console.error("Reset password error:", err);
-        res.status(500).json({ success: false, message: "Server error" });
+        res.status(500).json({ success: false, message: `Server error: ${err.message}` });
     }
 });
 
