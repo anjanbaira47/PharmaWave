@@ -224,41 +224,16 @@ function authenticateToken(req, res, next) {
 // ==========================================
 // 👤 USER SERVICE (Authentication & Profiles)
 // ==========================================
-// GOOGLE AUTH API — Verifies Google ID Token via Google's public tokeninfo endpoint (no SDK needed)
+// GOOGLE AUTH API — Accepts Firebase-verified email directly (Firebase handles client-side auth)
 app.post("/api/auth/google", async (req, res) => {
     try {
-        const { token } = req.body;
+        const { email, name, picture } = req.body;
 
-        if (!token) {
-            return res.status(400).json({ success: false, message: "No token provided." });
+        if (!email) {
+            return res.status(400).json({ success: false, message: "No Google email provided." });
         }
 
-        // Verify the Google ID token using Google's public tokeninfo REST endpoint.
-        // Works with credential.idToken from Firebase signInWithPopup — no SDK or credentials required.
-        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-        const tokenInfo = await verifyRes.json();
-
-        if (tokenInfo.error || !tokenInfo.email) {
-            console.error("Google tokeninfo error:", tokenInfo.error_description || tokenInfo.error);
-            return res.status(401).json({ success: false, message: "Invalid Google token. Please try again." });
-        }
-
-        // Optional: verify the token audience matches our Firebase project
-        const expectedAudiences = [
-            '528351606474-fd3vem1np095i69ivpli62jefr5rfc61.apps.googleusercontent.com',
-            process.env.GOOGLE_CLIENT_ID
-        ].filter(Boolean);
-
-        if (expectedAudiences.length > 0 && !expectedAudiences.includes(tokenInfo.aud)) {
-            console.error("Token audience mismatch:", tokenInfo.aud);
-            return res.status(401).json({ success: false, message: "Invalid token audience." });
-        }
-
-        const email = tokenInfo.email;
-        const name = tokenInfo.name;
-        const picture = tokenInfo.picture;
-
-        // Check if user exists by email
+        // Look up user by their Google email
         let [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
         let user;
 
@@ -270,7 +245,6 @@ app.post("/api/auth/google", async (req, res) => {
                 user.profile_pic = picture;
             }
         } else {
-            // No auto-signup — user must register first
             return res.status(404).json({ 
                 success: false, 
                 message: "No account found for this Google email. Please Sign Up first!" 

@@ -38,22 +38,16 @@
             try {
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
-                
-                // Get the Google OAuth ID token — this is what Google's tokeninfo endpoint verifies.
-                const credential = GoogleAuthProvider.credentialFromResult(result);
-                const googleIdToken = credential.idToken;
 
-                if (!googleIdToken) {
-                    throw new Error("Could not retrieve Google ID Token from Firebase result.");
-                }
-
-                // Exchange the Google token with our backend
+                // Firebase has already authenticated the user on the client.
+                // Send the verified email + profile directly — no token verification needed.
                 const exchangeRes = await fetch(`${API_BASE}/api/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        token: googleIdToken,
-                        role: 'user'
+                        email: user.email,
+                        name: user.displayName,
+                        picture: user.photoURL
                     })
                 });
 
@@ -67,11 +61,9 @@
                         role: authData.role,
                         token: authData.token
                     }));
-
                     showToast("Google Login Successful! Redirecting...", "success");
                     setTimeout(() => { window.location.href = "index.html"; }, 1500);
                 } else {
-                    // Show the "Sign Up First" error clearly
                     showToast(authData.message || "Login failed", "error");
                 }
 
