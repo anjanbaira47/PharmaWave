@@ -7,7 +7,14 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const http = require("http");
 const { Server } = require("socket.io");
-const { OAuth2Client } = require("google-auth-library");
+const admin = require("firebase-admin");
+
+// Initialize Firebase Admin SDK (no service account needed — uses projectId to fetch Google's public keys)
+if (!admin.apps.length) {
+    admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID || 'pro-pharma-wave'
+    });
+}
 const path = require("path");
 const os = require("os");
 const nodemailer = require("nodemailer");
@@ -30,7 +37,7 @@ const emailTransporter = nodemailer.createTransport({
 });
 
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// google-auth-library is no longer needed; Firebase Admin handles token verification
 
 // Create default JWT Secret if none provided in .env
 const JWT_SECRET = process.env.JWT_SECRET || "pharma_wave_secure_super_secret_key_production";
@@ -217,26 +224,24 @@ function authenticateToken(req, res, next) {
 // ==========================================
 // 👤 USER SERVICE (Authentication & Profiles)
 // ==========================================
-// GOOGLE AUTH API
+// GOOGLE AUTH API — Verifies Firebase ID Token using Firebase Admin SDK
 app.post("/api/auth/google", async (req, res) => {
     try {
-        const { token, role } = req.body;
-        
-        // Support multiple audiences (The one from the code and the one from Firebase)
-        const audiences = [
-            process.env.GOOGLE_CLIENT_ID,
-            '528351606474-fd3vem1np095i69ivpli62jefr5rfc61.apps.googleusercontent.com', // Corrected Client ID from user screenshot
-            '111780913791-qnn4b2m4ir2243m77dicnbbktf6nutkt.apps.googleusercontent.com' // Keeping legacy just in case
-        ].filter(Boolean);
+        const { token } = req.body;
 
-        const ticket = await googleClient.verifyIdToken({
-            idToken: token,
-            audience: audiences
-        });
-        const payload = ticket.getPayload();
-        const email = payload.email;
-        const name = payload.name;
-        const picture = payload.picture;
+        if (!token) {
+            return res.status(400).json({ success: false, message: "No token provided." });
+        }
+
+        // Firebase Admin correctly verifies tokens issued by Firebase's signInWithPopup
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const email = decodedToken.email;
+        const name = decodedToken.name;
+        const picture = decodedToken.picture;
+
+        if (!email) {
+            return res.status(400).json({ success: false, message: "Could not retrieve email from Google token." });
+        }
 
         // Check if user exists by email
         let [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
@@ -244,13 +249,13 @@ app.post("/api/auth/google", async (req, res) => {
 
         if (rows.length > 0) {
             user = rows[0];
-            // Update profile pic if empty
+            // Update profile pic if not set
             if (!user.profile_pic && picture) {
                 await pool.query("UPDATE users SET profile_pic = ? WHERE id = ?", [picture, user.id]);
                 user.profile_pic = picture;
             }
         } else {
-            // New Requirement: NO auto-signup.
+            // No auto-signup — user must register first
             return res.status(404).json({ 
                 success: false, 
                 message: "No account found for this Google email. Please Sign Up first!" 
@@ -273,13 +278,14 @@ app.post("/api/auth/google", async (req, res) => {
             role: user.role || 'user'
         });
     } catch (err) {
-        console.error("Google Auth Error details:", err);
-        const decoded = jwt.decode(req.body ? req.body.token : null);
-        const detectedAud = decoded ? decoded.aud : "none";
-        res.status(500).json({ 
-            success: false, 
-            message: `Google Authentication failed: ${err.message}. (Token Audience: ${detectedAud})` 
-        });
+        console.error("Google Auth Error:", err.code, err.message);
+        let friendlyMessage = "Google Authentication failed. Please try again.";
+        if (err.code === 'auth/id-token-expired') {
+            friendlyMessage = "Your Google session expired. Please sign in again.";
+        } else if (err.code === 'auth/argument-error' || err.code === 'auth/invalid-id-token') {
+            friendlyMessage = "Invalid Google token. Please try again.";
+        }
+        res.status(401).json({ success: false, message: friendlyMessage });
     }
 });
 
