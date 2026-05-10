@@ -224,7 +224,7 @@ function authenticateToken(req, res, next) {
 // ==========================================
 // 👤 USER SERVICE (Authentication & Profiles)
 // ==========================================
-// GOOGLE AUTH API — Verifies Firebase ID Token using Firebase Admin SDK
+// GOOGLE AUTH API — Verifies Google ID Token via Google's public tokeninfo endpoint (no SDK needed)
 app.post("/api/auth/google", async (req, res) => {
     try {
         const { token } = req.body;
@@ -233,15 +233,30 @@ app.post("/api/auth/google", async (req, res) => {
             return res.status(400).json({ success: false, message: "No token provided." });
         }
 
-        // Firebase Admin correctly verifies tokens issued by Firebase's signInWithPopup
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        const email = decodedToken.email;
-        const name = decodedToken.name;
-        const picture = decodedToken.picture;
+        // Verify the Google ID token using Google's public tokeninfo REST endpoint.
+        // Works with credential.idToken from Firebase signInWithPopup — no SDK or credentials required.
+        const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+        const tokenInfo = await verifyRes.json();
 
-        if (!email) {
-            return res.status(400).json({ success: false, message: "Could not retrieve email from Google token." });
+        if (tokenInfo.error || !tokenInfo.email) {
+            console.error("Google tokeninfo error:", tokenInfo.error_description || tokenInfo.error);
+            return res.status(401).json({ success: false, message: "Invalid Google token. Please try again." });
         }
+
+        // Optional: verify the token audience matches our Firebase project
+        const expectedAudiences = [
+            '528351606474-fd3vem1np095i69ivpli62jefr5rfc61.apps.googleusercontent.com',
+            process.env.GOOGLE_CLIENT_ID
+        ].filter(Boolean);
+
+        if (expectedAudiences.length > 0 && !expectedAudiences.includes(tokenInfo.aud)) {
+            console.error("Token audience mismatch:", tokenInfo.aud);
+            return res.status(401).json({ success: false, message: "Invalid token audience." });
+        }
+
+        const email = tokenInfo.email;
+        const name = tokenInfo.name;
+        const picture = tokenInfo.picture;
 
         // Check if user exists by email
         let [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
@@ -278,16 +293,11 @@ app.post("/api/auth/google", async (req, res) => {
             role: user.role || 'user'
         });
     } catch (err) {
-        console.error("Google Auth Error:", err.code, err.message);
-        let friendlyMessage = "Google Authentication failed. Please try again.";
-        if (err.code === 'auth/id-token-expired') {
-            friendlyMessage = "Your Google session expired. Please sign in again.";
-        } else if (err.code === 'auth/argument-error' || err.code === 'auth/invalid-id-token') {
-            friendlyMessage = "Invalid Google token. Please try again.";
-        }
-        res.status(401).json({ success: false, message: friendlyMessage });
+        console.error("Google Auth Error:", err.message);
+        res.status(500).json({ success: false, message: "Google Authentication failed. Please try again." });
     }
 });
+
 
 // FORGOT PASSWORD API
 app.post("/api/auth/forgot-password", async (req, res) => {

@@ -39,20 +39,20 @@
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
                 
-                // Use Firebase ID Token — this is what firebase-admin.verifyIdToken() validates.
-                // (credential.idToken is a Google OAuth token and won't work with firebase-admin)
-                const firebaseIdToken = await user.getIdToken();
+                // Get the Google OAuth ID token — this is what Google's tokeninfo endpoint verifies.
+                const credential = GoogleAuthProvider.credentialFromResult(result);
+                const googleIdToken = credential.idToken;
 
-                if (!firebaseIdToken) {
-                    throw new Error("Could not retrieve Firebase ID Token from authentication result.");
+                if (!googleIdToken) {
+                    throw new Error("Could not retrieve Google ID Token from Firebase result.");
                 }
 
-                // SECURE EXCHANGE: Pass the Firebase ID Token to the server
+                // Exchange the Google token with our backend
                 const exchangeRes = await fetch(`${API_BASE}/api/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        token: firebaseIdToken,
+                        token: googleIdToken,
                         role: 'user'
                     })
                 });
