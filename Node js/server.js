@@ -597,13 +597,30 @@ app.post("/api/agent/register", async (req, res) => {
 // 💊 MEDICINE SERVICE (Product Catalog)
 // ==========================================
 // GET PRODUCTS API
+const FALLBACK_PRODUCTS = [
+    { id: 1, name: "Paracetamol 500mg", category: "Pain Relief", price: 5.99, image_url: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=500&auto=format&fit=crop&q=60", description: "Effective for pain relief and fever reducing.", stock: 100 },
+    { id: 2, name: "Vitamin C Supplement", category: "Vitamins", price: 12.50, image_url: "https://images.unsplash.com/photo-1550572017-edb9cf1209b6?w=500&auto=format&fit=crop&q=60", description: "Boosts immune system.", stock: 100 },
+    { id: 3, name: "Cough Syrup", category: "Cold & Flu", price: 8.25, image_url: "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=500&auto=format&fit=crop&q=60", description: "Relieves dry and tickly coughs.", stock: 100 },
+    { id: 4, name: "First Aid Kit", category: "First Aid", price: 24.99, image_url: "https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=500&auto=format&fit=crop&q=60", description: "Comprehensive first aid essentials.", stock: 100 },
+    { id: 5, name: "Allergy Relief Tablets", category: "Allergy", price: 14.00, image_url: "https://plus.unsplash.com/premium_photo-1661630983141-8f4dfbc52bf1?w=500&auto=format&fit=crop&q=60", description: "Fast relief from allergy symptoms.", stock: 100 },
+    { id: 6, name: "Aspirin 81mg", category: "Pain Relief", price: 6.50, image_url: "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=500&auto=format&fit=crop&q=60", description: "Low dose aspirin regimen.", stock: 100 },
+    { id: 7, name: "Amoxicillin 250mg", category: "Antibiotics", price: 15.00, image_url: "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=500&auto=format&fit=crop&q=60", description: "Prescription antibiotic.", stock: 100 },
+    { id: 8, name: "Ibuprofen 400mg", category: "Pain Relief", price: 7.50, image_url: "https://images.unsplash.com/photo-1577401239170-897942555fb3?w=500&auto=format&fit=crop&q=60", description: "Reduces inflammation and pain.", stock: 100 },
+    { id: 9, name: "Multivitamin For Men", category: "Vitamins", price: 22.99, image_url: "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=500&auto=format&fit=crop&q=60", description: "Daily nutritional support for men.", stock: 100 },
+    { id: 10, name: "Multivitamin For Women", category: "Vitamins", price: 22.99, image_url: "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=500&auto=format&fit=crop&q=60", description: "Daily nutritional support for women.", stock: 100 },
+    { id: 11, name: "Hydration Salts", category: "First Aid", price: 4.50, image_url: "https://images.unsplash.com/photo-1512069772995-ec65ed45afd6?w=500&auto=format&fit=crop&q=60", description: "Fast rehydration therapy.", stock: 100 },
+    { id: 12, name: "Hand Sanitizer 500ml", category: "First Aid", price: 5.00, image_url: "https://images.unsplash.com/photo-1584483766114-2cea6facdcaa?w=500&auto=format&fit=crop&q=60", description: "Kills 99.9% of germs.", stock: 100 },
+    { id: 13, name: "Antihistamine Tablets", category: "Allergy", price: 11.20, image_url: "https://plus.unsplash.com/premium_photo-1661630983141-8f4dfbc52bf1?w=500&auto=format&fit=crop&q=60", description: "Non-drowsy allergy relief.", stock: 100 },
+    { id: 14, name: "Digital Thermometer", category: "First Aid", price: 18.50, image_url: "https://images.unsplash.com/photo-1584362917165-526a968579e8?w=500&auto=format&fit=crop&q=60", description: "Accurate temperature reading in seconds.", stock: 100 }
+];
+
 app.get("/api/products", async (req, res) => {
     try {
         const [rows] = await pool.query("SELECT * FROM products");
         res.json({ success: true, products: rows });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Server error fetching products" });
+        console.error("DB down, serving fallback products:", err.message);
+        res.json({ success: true, products: FALLBACK_PRODUCTS });
     }
 });
 
