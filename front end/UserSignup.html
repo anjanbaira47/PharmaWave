@@ -60,11 +60,27 @@
             <div class="input-box">
                 <input type="email" id="emailOrMobile" class="input-field" placeholder="Email (Google verified)">
             </div>
-            <div class="input-box">
-                <input type="password" id="password" class="input-field" placeholder="Password">
+            <div class="input-box" style="position: relative;">
+                <input type="password" id="password" class="input-field" placeholder="Password" style="padding-right: 50px;" oninput="checkPasswordRules(this.value)">
+                <button type="button" onclick="togglePwd('password','eyeIcon1')" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#64748b;font-size:20px;display:flex;align-items:center;padding:0;">
+                    <ion-icon id="eyeIcon1" name="eye-outline"></ion-icon>
+                </button>
             </div>
-            <div class="input-box">
-                <input type="password" id="confirmPassword" class="input-field" placeholder="Confirm Password">
+
+            <!-- Password Rules -->
+            <div id="pwdRules" style="background:rgba(0,0,0,0.04); border-radius:12px; padding:12px 16px; margin-top:-10px; margin-bottom:10px; font-size:13px; display:none;">
+                <p style="margin:0 0 6px; font-weight:700; color:#334155; font-size:12px;">PASSWORD REQUIREMENTS</p>
+                <div id="rule-capital" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;color:#94a3b8;"><ion-icon name="close-circle"></ion-icon> First letter must be uppercase</div>
+                <div id="rule-number" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;color:#94a3b8;"><ion-icon name="close-circle"></ion-icon> Must contain a number (0–9)</div>
+                <div id="rule-special" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;color:#94a3b8;"><ion-icon name="close-circle"></ion-icon> Must contain a special character (!@#$...)</div>
+                <div id="rule-length" style="display:flex;align-items:center;gap:8px;color:#94a3b8;"><ion-icon name="close-circle"></ion-icon> Minimum 8 characters</div>
+            </div>
+
+            <div class="input-box" style="position: relative;">
+                <input type="password" id="confirmPassword" class="input-field" placeholder="Confirm Password" style="padding-right: 50px;">
+                <button type="button" onclick="togglePwd('confirmPassword','eyeIcon2')" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#64748b;font-size:20px;display:flex;align-items:center;padding:0;">
+                    <ion-icon id="eyeIcon2" name="eye-outline"></ion-icon>
+                </button>
             </div>
 
             <input type="submit" class="submit-btn" value="Create Account">
@@ -92,6 +108,36 @@
             setTimeout(() => { toast.className = toast.className.replace("show", "").trim(); }, 3000);
         }
 
+        function togglePwd(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            input.type = input.type === 'password' ? 'text' : 'password';
+            icon.setAttribute('name', input.type === 'password' ? 'eye-outline' : 'eye-off-outline');
+        }
+
+        function setRule(id, pass) {
+            const el = document.getElementById(id);
+            el.style.color = pass ? '#10b981' : '#94a3b8';
+            el.querySelector('ion-icon').setAttribute('name', pass ? 'checkmark-circle' : 'close-circle');
+        }
+
+        function checkPasswordRules(val) {
+            const rules = document.getElementById('pwdRules');
+            rules.style.display = val.length > 0 ? 'block' : 'none';
+            setRule('rule-capital', /^[A-Z]/.test(val));
+            setRule('rule-number', /[0-9]/.test(val));
+            setRule('rule-special', /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(val));
+            setRule('rule-length', val.length >= 8);
+        }
+
+        function validatePassword(password) {
+            if (!/^[A-Z]/.test(password)) { showToast('Password must start with a capital letter', 'error'); return false; }
+            if (!/[0-9]/.test(password)) { showToast('Password must contain at least one number', 'error'); return false; }
+            if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) { showToast('Password must contain a special character (!@#$...)', 'error'); return false; }
+            if (password.length < 8) { showToast('Password must be at least 8 characters', 'error'); return false; }
+            return true;
+        }
+
         (function () {
             const submitBtn = document.querySelector('.submit-btn');
 
@@ -107,6 +153,9 @@
                     showToast('Please fill all fields!', "error");
                     return;
                 }
+
+                // Password rules validation
+                if (!validatePassword(password)) return;
 
                 // Only allow verified/professional email addresses
                 // Reject random emails like "xyz@gmail.com" or "blaa@blaa"

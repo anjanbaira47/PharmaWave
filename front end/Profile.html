@@ -630,6 +630,14 @@
         const toast = document.getElementById("toast");
         const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
 
+        // Defined early so all functions below can use it
+        function getAuthHeaders() {
+            return {
+                'Authorization': `Bearer ${currentUser ? currentUser.token : ''}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
         function showToast(message, type = "success") {
             toast.textContent = message; toast.className = "show " + type;
             
@@ -1152,16 +1160,20 @@
             }
         }
 
+
         // ==========================================
         // PRESCRIPTION LOGIC
         // ==========================================
         async function fetchPrescriptions() {
+            const grid = document.getElementById("prescriptionsGrid");
+            grid.innerHTML = `<div style="text-align:center; padding:20px;"><ion-icon name="reload-outline" style="font-size:32px; color:#10b981; animation: spin 1s linear infinite;"></ion-icon><p style="color:#64748b; font-weight:600; margin-top:8px;">Loading prescriptions...</p></div>`;
             try {
                 const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/prescriptions`, { headers: getAuthHeaders() });
+                
+                if (!res.ok) throw new Error('Server error: ' + res.status);
                 const data = await res.json();
 
-                const grid = document.getElementById("prescriptionsGrid");
-                grid.innerHTML = "";
+                grid.innerHTML = '';
 
                 if (data.success && data.prescriptions) {
                     if (data.prescriptions.length > 0) {
@@ -1173,7 +1185,7 @@
                             grid.innerHTML += `
                                 <div style="background: var(--surface); border: 1px solid var(--border-dark); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
                                     <div style="height: 150px; background: #e2e8f0; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                                        <img src="${p.image_data}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src=''; this.parentElement.innerHTML='<ion-icon name=\`document\` style=\`font-size:40px; color:#94a3b8;\`></ion-icon>'">
+                                        <img src="${p.image_data}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='<ion-icon name=&quot;document&quot; style=&quot;font-size:40px; color:#94a3b8;&quot;></ion-icon>'">
                                         <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; font-weight: 800; padding: 4px 12px; border-radius: 50px; background: rgba(255,255,255,0.9); color: ${badgeColor}; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${statusText.toUpperCase()}</div>
                                     </div>
                                     <div style="padding: 15px;">
@@ -1198,7 +1210,16 @@
                 }
             } catch (err) { 
                 console.error("Fetch prescriptions error:", err); 
-                document.getElementById("prescriptionsGrid").innerHTML = `<p style="color: #ef4444;">Error loading prescriptions. Please refresh.</p>`;
+                grid.innerHTML = `
+                    <div style="grid-column:1/-1; text-align:center; padding:40px; background:rgba(239,68,68,0.05); border-radius:20px; border:1px dashed #ef4444;">
+                        <ion-icon name="cloud-offline-outline" style="font-size:40px; color:#ef4444; margin-bottom:10px;"></ion-icon>
+                        <p style="color:#ef4444; font-weight:700; margin:0;">Could not connect to server.</p>
+                        <p style="color:#94a3b8; font-size:14px; margin:8px 0 0;">Your prescriptions are saved on the server. Please try again when the connection is restored.</p>
+                        <button onclick="fetchPrescriptions()" style="margin-top:15px; background:#10b981; color:white; border:none; padding:10px 20px; border-radius:10px; font-weight:700; cursor:pointer;">
+                            <ion-icon name="reload-outline"></ion-icon> Retry
+                        </button>
+                    </div>
+                `;
             }
         }
 
