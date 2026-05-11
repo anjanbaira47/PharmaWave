@@ -269,7 +269,7 @@
                     setTimeout(() => { window.location.href = "DeliveryDashboard.html"; }, 2000);
                     return true;
                 }
-                if (email === 'anjanbaira@gmail.com' && password === 'test123') {
+                if ((email === 'anjanbaira@gmail.com' || email === 'user@gmail.com') && (password === 'test123' || password === 'user123')) {
                     showToast("Server unreachable. Entering Offline User Mode...", "success");
                     localStorage.setItem('pharmaUser', JSON.stringify({
                         userId: 1, username: 'Anjan (Offline)', role: 'user', token: 'offline-demo-token'
