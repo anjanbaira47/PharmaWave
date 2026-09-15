@@ -724,7 +724,7 @@
 
                 if (data.success) {
 
-                    // For COD / Wallet
+                    // COD order is complete after the server transaction commits.
                     if (isSubscribed) {
                         try {
                             await fetch(`${API_BASE}/api/subscriptions`, {

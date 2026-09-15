@@ -991,51 +991,6 @@
             window.location.href = "index.html";
         }
 
-        // ==========================================
-        // STRIPE PAYMENT VERIFICATION
-        // ==========================================
-        async function checkPaymentStatus() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const sessionId = urlParams.get('session_id');
-            const orderId = urlParams.get('order_id');
-            const paymentFailed = urlParams.get('payment');
-
-            if (paymentFailed === 'failed') {
-                showToast("Payment was cancelled or failed. Please try again.", "error");
-                // Clean up URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-                return;
-            }
-
-            if (sessionId && orderId) {
-                try {
-                    showToast("Verifying payment...", "success");
-                    const res = await fetch(`${API_BASE}/api/payment/success`, {
-                        method: 'POST',
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify({ orderId, sessionId })
-                    });
-
-                    const data = await res.json();
-                    if (data.success) {
-                        showToast("Payment complete! Your order is now preparing.", "success");
-                        switchTab('order-history');
-                    } else {
-                        showToast("Payment verification failed.", "error");
-                    }
-                } catch (e) {
-                    console.error("Payment verify error", e);
-                    showToast("Server error verifying payment.", "error");
-                } finally {
-                    // Clean up URL
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-            }
-        }
-
-        // Run checking on load
-        document.addEventListener('DOMContentLoaded', checkPaymentStatus);
-
         // Avatar Upload
         function getAuthHeaders() {
             return {

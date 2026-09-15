@@ -206,7 +206,6 @@
 
             <div class="login-tabs">
                 <div class="login-tab active" onclick="switchLoginMode('password')">Password</div>
-                <div class="login-tab" onclick="switchLoginMode('otp')">OTP Login</div>
             </div>
 
             <div id="passwordSection">
@@ -218,20 +217,6 @@
                 </div>
                 <button class="submit-btn" id="loginBtn">Authorize Session</button>
             </div>
-
-            <div id="otpSection" style="display: none;">
-                <div class="input-box">
-                    <input type="text" id="otpMobile" class="input-field" placeholder="Enter Mobile Number">
-                </div>
-                <div class="input-box" id="otpCodeContainer" style="display: none;">
-                    <input type="text" id="otpCode" class="input-field" placeholder="Enter 6-digit OTP" style="letter-spacing: 5px; font-weight: bold; text-align: center;">
-                </div>
-                <button class="submit-btn" id="sendOtpBtn" onclick="handleOtpFlow()">Send OTP</button>
-            </div>
-
-            <button class="biometric-btn" onclick="handleBiometricLogin()">
-                <ion-icon name="finger-print" style="font-size: 24px;"></ion-icon> Authenticate Biometrically
-            </button>
 
             <div class="auth-links" style="text-align: center; margin-top: 20px;">
                 <a href="ForgotPassword.html"
@@ -277,35 +262,6 @@
                 document.querySelectorAll('.login-tab')[1].classList.add('active');
                 document.getElementById('passwordSection').style.display = 'none';
                 document.getElementById('otpSection').style.display = 'block';
-            }
-        }
-
-        function handleBiometricLogin() {
-            const savedUser = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
-            if (!savedUser || !savedUser.role || savedUser.role !== 'delivery') {
-                showToast("Biometric access requires a valid saved delivery session. Please sign in with password.", "error");
-                return;
-            }
-
-            showToast("Authenticating with Face ID / Fingerprint...", "success");
-            setTimeout(() => {
-                window.location.href = 'DeliveryDashboard.html';
-            }, 1500);
-        }
-
-        let otpSent = false;
-        function handleOtpFlow() {
-            const btn = document.getElementById('sendOtpBtn');
-            const mobile = document.getElementById('otpMobile').value.trim();
-            if(!otpSent) {
-                if(!mobile) return showToast("Enter mobile number", "error");
-                btn.textContent = 'Sending...';
-                setTimeout(() => {
-                    showToast("OTP service is not available for this environment. Please use password login.", "error");
-                    btn.textContent = 'Use Password Login';
-                }, 1000);
-            } else {
-                showToast("OTP verification is unavailable. Please use password login.", "error");
             }
         }
 

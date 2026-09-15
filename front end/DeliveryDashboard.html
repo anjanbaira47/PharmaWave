@@ -478,13 +478,7 @@
         <div style="background: white; padding: 40px; border-radius: 20px; width: 100%; max-width: 450px; text-align: center;">
             <ion-icon name="shield-checkmark" style="font-size: 60px; color: #10b981; margin-bottom: 15px;"></ion-icon>
             <h2 style="margin: 0 0 10px 0;">Proof of Delivery</h2>
-            <p style="color: #64748b; margin-bottom: 25px;">Please confirm the customer OTP or take a photo to mark the order as securely delivered.</p>
-            
-            <input type="text" id="podOtp" placeholder="Enter 4-Digit OTP" style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 18px; letter-spacing: 5px; text-align: center; margin-bottom: 15px; font-weight: 800;">
-            <div style="color: #64748b; font-weight: 600; margin-bottom: 15px;">— OR —</div>
-            <button onclick="showToast('Camera Opened', 'success')" style="background: #f8fafc; border: 2px dashed #cbd5e1; color: #475569; width: 100%; padding: 15px; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 25px;">
-                <ion-icon name="camera" style="font-size: 24px;"></ion-icon> Capture Photo Proof
-            </button>
+            <p style="color: #64748b; margin-bottom: 25px;">Confirm that the customer has received the order.</p>
             
             <div style="display: flex; gap: 15px;">
                 <button onclick="closePodModal()" style="flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: white; font-weight: 700; cursor: pointer;">Cancel</button>
@@ -529,15 +523,15 @@
 
         function closePodModal() {
             currentDeliveryId = null;
-            document.getElementById('podOtp').value = '';
             document.getElementById('podModal').style.display = 'none';
         }
 
         document.getElementById('podConfirmBtn').addEventListener('click', () => {
-            const otpCode = document.getElementById('podOtp').value;
+            const deliveryId = currentDeliveryId;
+            if (!deliveryId) return;
             showToast("Proof verified! Order Delivered.", "success");
             closePodModal();
-            updateStatus(currentDeliveryId, 'Delivered');
+            updateStatus(deliveryId, 'Delivered');
         });
 
         function getAuthHeaders() {
