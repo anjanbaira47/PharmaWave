@@ -386,9 +386,11 @@
                     const addressSelect = document.getElementById('checkoutAddress');
                     addressSelect.innerHTML = '<option value="">Select Delivery Address...</option>';
                     data.addresses.forEach(addr => {
+                        const title = addr.title || addr.label || 'Home';
+                        const fullAddress = addr.full_address || addr.fullAddress || '';
                         const opt = document.createElement('option');
                         opt.value = addr.id;
-                        opt.textContent = `${addr.title} - ${addr.full_address.substring(0, 30)}...`;
+                        opt.textContent = `${title} - ${fullAddress.substring(0, 30)}${fullAddress.length > 30 ? '...' : ''}`;
                         if (addr.is_default) opt.selected = true;
                         addressSelect.appendChild(opt);
                     });
@@ -872,8 +874,12 @@
                                 'Authorization': `Bearer ${currentUser.token || ''}`
                             },
                             body: JSON.stringify({
-                                title: "Current Location (Live)",
+                                full_name: currentUser.full_name || currentUser.username || 'Customer',
+                                mobile: currentUser.contact || '0000000000',
+                                label: "Current Location (Live)",
                                 full_address: fullAddr,
+                                latitude,
+                                longitude,
                                 is_default: true
                             })
                         });
@@ -882,9 +888,8 @@
                         if (saveData.success) {
                             showToast("Location secured & saved!", "success");
                             await fetchUserAddresses(); // Refresh list
-                            // Find the new live address and select it
                             const addressSelect = document.getElementById('checkoutAddress');
-                            // The most recent default address should already be selected by fetchUserAddresses
+                            if (saveData.addressId) addressSelect.value = String(saveData.addressId);
                         } else {
                             showToast("Failed to save live location.", "error");
                         }

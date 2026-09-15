@@ -281,24 +281,15 @@
         }
 
         function handleBiometricLogin() {
-            const trustedAgent = localStorage.getItem('pharmaAgentTrusted');
-            if (!trustedAgent) {
-                showToast("Biometric access not configured. Please sign in with password first to enable.", "error");
+            const savedUser = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+            if (!savedUser || !savedUser.role || savedUser.role !== 'delivery') {
+                showToast("Biometric access requires a valid saved delivery session. Please sign in with password.", "error");
                 return;
             }
-            
+
             showToast("Authenticating with Face ID / Fingerprint...", "success");
             setTimeout(() => {
-                // If they were already trusted, we restore their session info if possible, 
-                // or just allow entry if we trust the device (mock logic for demo)
-                const savedUser = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
-                if (savedUser.role === 'delivery') {
-                    window.location.href = 'DeliveryDashboard.html';
-                } else {
-                    // If no valid user session, but trusted device, we mock a session for the trusted agent
-                    localStorage.setItem('pharmaUser', JSON.stringify({ userId: 99, username: 'Trusted Agent', role: 'delivery', token: 'mock-trusted-token' }));
-                    window.location.href = 'DeliveryDashboard.html';
-                }
+                window.location.href = 'DeliveryDashboard.html';
             }, 1500);
         }
 
@@ -310,21 +301,11 @@
                 if(!mobile) return showToast("Enter mobile number", "error");
                 btn.textContent = 'Sending...';
                 setTimeout(() => {
-                    showToast("OTP Sent to " + mobile, "success");
-                    document.getElementById('otpCodeContainer').style.display = 'block';
-                    btn.textContent = 'Verify OTP & Login';
-                    otpSent = true;
+                    showToast("OTP service is not available for this environment. Please use password login.", "error");
+                    btn.textContent = 'Use Password Login';
                 }, 1000);
             } else {
-                const code = document.getElementById('otpCode').value.trim();
-                if(!code || code.length < 4) return showToast("Enter valid OTP", "error");
-                btn.textContent = 'Verifying...';
-                setTimeout(() => {
-                    showToast("OTP Verified. Deploying Dashboard...", "success");
-                    // Mock storing agent login state
-                    localStorage.setItem('pharmaAgent', JSON.stringify({ userId: 99, role: 'delivery' }));
-                    window.location.href = "DeliveryDashboard.html";
-                }, 1500);
+                showToast("OTP verification is unavailable. Please use password login.", "error");
             }
         }
 
@@ -345,22 +326,6 @@
 
             loginBtn.textContent = 'Authorizing...';
             loginBtn.disabled = true;
-
-            // Shared offline demo fallback — fires on server errors AND network failures
-            function tryAgentFallback() {
-                const id = username.toLowerCase();
-                if ((id === 'agent1' || id === 'agent@pharmawave.com') && password === 'agent123') {
-                    showToast("Fleet Server Offline. Proceeding with Local Demo Session...", "success");
-                    localStorage.setItem('pharmaAgentTrusted', 'true');
-                    localStorage.setItem('pharmaUser', JSON.stringify({
-                        userId: 19, username: 'agent1 (Offline)', role: 'delivery', token: 'offline-demo-token'
-                    }));
-                    loginBtn.textContent = 'Success';
-                    setTimeout(() => window.location.href = "DeliveryDashboard.html", 2000);
-                    return true;
-                }
-                return false;
-            }
 
             try {
                 const response = await fetch(`${API_BASE}/api/agent/login`, {
@@ -387,21 +352,15 @@
 
                     setTimeout(() => window.location.href = "DeliveryDashboard.html", 2000);
                 } else {
-                    // Server responded with an error — try demo fallback first
-                    if (!tryAgentFallback()) {
-                        showToast(data.message || "Invalid credentials", "error");
-                        loginBtn.textContent = 'Authorize Session';
-                        loginBtn.disabled = false;
-                    }
-                }
-            } catch (err) {
-                console.error(err);
-                // Network error — try demo fallback
-                if (!tryAgentFallback()) {
-                    showToast("Fleet Server Offline. Could not connect.", "error");
+                    showToast(data.message || "Invalid credentials", "error");
                     loginBtn.textContent = 'Authorize Session';
                     loginBtn.disabled = false;
                 }
+            } catch (err) {
+                console.error(err);
+                showToast("Fleet Server Offline. Could not connect.", "error");
+                loginBtn.textContent = 'Authorize Session';
+                loginBtn.disabled = false;
             }
         });
     </script>

@@ -123,27 +123,129 @@ async function initDB() {
         }
 
         // 1. Create All Tables First
-        await pool.query(`CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, contact VARCHAR(255))`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS products (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, category VARCHAR(255), price DECIMAL(10, 2) NOT NULL, image_url VARCHAR(500), description TEXT, stock INT DEFAULT 100, expiry_date DATE)`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS orders (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, total_amount DECIMAL(10, 2) NOT NULL, status VARCHAR(50) DEFAULT 'Pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS addresses (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, title VARCHAR(100) NOT NULL, full_address TEXT NOT NULL, is_default BOOLEAN DEFAULT FALSE, FOREIGN KEY (user_id) REFERENCES users(id))`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS order_items (id INT AUTO_INCREMENT PRIMARY KEY, order_id INT, product_id INT, quantity INT NOT NULL, price DECIMAL(10, 2) NOT NULL, FOREIGN KEY (order_id) REFERENCES orders(id), FOREIGN KEY (product_id) REFERENCES products(id))`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS prescriptions (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, image_data LONGTEXT NOT NULL, status VARCHAR(50) DEFAULT 'Pending Review', uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            email VARCHAR(255),
+            contact VARCHAR(255),
+            full_name VARCHAR(255),
+            profile_pic LONGTEXT,
+            role VARCHAR(50) DEFAULT 'user',
+            vehicle_type VARCHAR(50),
+            vehicle_number VARCHAR(100),
+            availability VARCHAR(50) DEFAULT 'Online',
+            reset_token VARCHAR(255),
+            email_notifications BOOLEAN DEFAULT TRUE,
+            sms_alerts BOOLEAN DEFAULT TRUE,
+            cart_data LONGTEXT
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS products (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            category VARCHAR(255),
+            price DECIMAL(10, 2) NOT NULL,
+            image_url VARCHAR(500),
+            description TEXT,
+            stock INT DEFAULT 100,
+            expiry_date DATE,
+            prescription_required BOOLEAN DEFAULT FALSE,
+            manufacturer VARCHAR(255),
+            discount DECIMAL(10, 2) DEFAULT 0.00,
+            min_stock INT DEFAULT 10,
+            is_active BOOLEAN DEFAULT TRUE
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            order_number VARCHAR(50) UNIQUE,
+            total_amount DECIMAL(10, 2) NOT NULL,
+            subtotal DECIMAL(10, 2) DEFAULT 0.00,
+            delivery_charge DECIMAL(10, 2) DEFAULT 0.00,
+            status VARCHAR(50) DEFAULT 'Pending',
+            payment_method VARCHAR(50) DEFAULT 'COD',
+            payment_status VARCHAR(50) DEFAULT 'Pending',
+            address_id INT,
+            prescription_id INT,
+            agent_id INT,
+            schedule VARCHAR(50) DEFAULT 'ASAP',
+            delivery_rating INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (address_id) REFERENCES addresses(id)
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS addresses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            full_name VARCHAR(255) NOT NULL,
+            mobile VARCHAR(20) NOT NULL,
+            house_number VARCHAR(100),
+            street VARCHAR(255),
+            city VARCHAR(120),
+            state VARCHAR(120),
+            pincode VARCHAR(20),
+            landmark VARCHAR(255),
+            label VARCHAR(50),
+            full_address TEXT NOT NULL,
+            latitude DECIMAL(10, 8),
+            longitude DECIMAL(11, 8),
+            is_default BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT,
+            product_id INT,
+            quantity INT NOT NULL,
+            price DECIMAL(10, 2) NOT NULL,
+            FOREIGN KEY (order_id) REFERENCES orders(id),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS prescriptions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            file_name VARCHAR(255),
+            mime_type VARCHAR(100),
+            file_size INT DEFAULT 0,
+            image_data LONGTEXT NOT NULL,
+            status VARCHAR(50) DEFAULT 'Pending Review',
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            order_id INT NOT NULL,
+            amount DECIMAL(10, 2) NOT NULL,
+            payment_method VARCHAR(50) NOT NULL,
+            payment_status VARCHAR(50) DEFAULT 'Pending',
+            transaction_reference VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )`);
         await pool.query(`CREATE TABLE IF NOT EXISTS pharmacies (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, location VARCHAR(255) NOT NULL, contact VARCHAR(255) NOT NULL, status VARCHAR(50) DEFAULT 'Active', joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
         await pool.query(`CREATE TABLE IF NOT EXISTS user_cards (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, card_title VARCHAR(100), card_number VARCHAR(20), expiry VARCHAR(10), FOREIGN KEY (user_id) REFERENCES users(id))`);
         await pool.query(`CREATE TABLE IF NOT EXISTS consultations (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, doctor_name VARCHAR(255), subject VARCHAR(255), date DATE, time TIME, status VARCHAR(50) DEFAULT 'Booked', FOREIGN KEY (user_id) REFERENCES users(id))`);
 
         // 2. Run Migrations / Alterations
-        try { await pool.query("ALTER TABLE users ADD COLUMN profile_pic LONGTEXT"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN email VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'user'"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN vehicle_type VARCHAR(50)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN vehicle_number VARCHAR(100)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN availability VARCHAR(50) DEFAULT 'Online'"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE users ADD COLUMN full_name VARCHAR(255)"); } catch (e) { }
         try { await pool.query("ALTER TABLE users ADD COLUMN email_notifications BOOLEAN DEFAULT TRUE"); } catch (e) { }
         try { await pool.query("ALTER TABLE users ADD COLUMN sms_alerts BOOLEAN DEFAULT TRUE"); } catch (e) { }
+        try { await pool.query("ALTER TABLE users ADD COLUMN cart_data LONGTEXT"); } catch (e) { }
+        try { await pool.query("ALTER TABLE products ADD COLUMN prescription_required BOOLEAN DEFAULT FALSE"); } catch (e) { }
+        try { await pool.query("ALTER TABLE products ADD COLUMN manufacturer VARCHAR(255)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE products ADD COLUMN discount DECIMAL(10, 2) DEFAULT 0.00"); } catch (e) { }
+        try { await pool.query("ALTER TABLE products ADD COLUMN min_stock INT DEFAULT 10"); } catch (e) { }
+        try { await pool.query("ALTER TABLE products ADD COLUMN is_active BOOLEAN DEFAULT TRUE"); } catch (e) { }
         try { await pool.query("ALTER TABLE products ADD COLUMN expiry_date DATE"); } catch (e) { }
+        try { await pool.query(`ALTER TABLE orders ADD COLUMN order_number VARCHAR(50) UNIQUE`); } catch (e) { }
+        try { await pool.query(`ALTER TABLE orders ADD COLUMN subtotal DECIMAL(10, 2) DEFAULT 0.00`); } catch (e) { }
+        try { await pool.query(`ALTER TABLE orders ADD COLUMN delivery_charge DECIMAL(10, 2) DEFAULT 0.00`); } catch (e) { }
+        try { await pool.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) DEFAULT 'Pending'`); } catch (e) { }
+        try { await pool.query(`ALTER TABLE orders ADD COLUMN prescription_id INT`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN agent_id INT`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN address_id INT`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50) DEFAULT 'COD'`); } catch (e) { }
@@ -151,28 +253,44 @@ async function initDB() {
         try { await pool.query(`ALTER TABLE orders ADD COLUMN delivery_rating INT DEFAULT NULL`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN lat DECIMAL(10, 8)`); } catch (e) { }
         try { await pool.query(`ALTER TABLE orders ADD COLUMN lng DECIMAL(11, 8)`); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN cart_data LONGTEXT"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN title VARCHAR(100) NOT NULL DEFAULT 'Home'"); } catch (e) { }
+        try { await pool.query("UPDATE addresses SET title = COALESCE(title, label, 'Home') WHERE title IS NULL OR title = ''"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN full_name VARCHAR(255)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN mobile VARCHAR(20)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN house_number VARCHAR(100)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN street VARCHAR(255)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN city VARCHAR(120)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN state VARCHAR(120)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN pincode VARCHAR(20)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN landmark VARCHAR(255)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN label VARCHAR(50)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN latitude DECIMAL(10, 8)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE addresses ADD COLUMN longitude DECIMAL(11, 8)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE prescriptions ADD COLUMN file_name VARCHAR(255)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE prescriptions ADD COLUMN mime_type VARCHAR(100)"); } catch (e) { }
+        try { await pool.query("ALTER TABLE prescriptions ADD COLUMN file_size INT DEFAULT 0"); } catch (e) { }
+        try { await pool.query("CREATE TABLE IF NOT EXISTS payments (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, order_id INT NOT NULL, amount DECIMAL(10,2) NOT NULL, payment_method VARCHAR(50) NOT NULL, payment_status VARCHAR(50) DEFAULT 'Pending', transaction_reference VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (order_id) REFERENCES orders(id))"); } catch (e) { }
 
         console.log("Database tables initialized successfully.");
 
-        // 3. Seed Data
-        // Seed Users
-        const [usersCount] = await pool.query('SELECT COUNT(*) as count FROM users');
-        if (usersCount[0].count === 0) {
-            const adminPassword = await bcrypt.hash('admin123', 10);
-            const deliveryPassword = await bcrypt.hash('agent123', 10);
-            const pharmacyPassword = await bcrypt.hash('pharmacy123', 10);
-            const userPassword = await bcrypt.hash('user123', 10);
-            
-            const values = [
-                ['admin', 'admin@pharmawave.com', adminPassword, 'admin', '1234567890'], 
-                ['agent1', 'agent@pharmawave.com', deliveryPassword, 'delivery', '0987654321'], 
-                ['pharmacy1', 'contact@citymedical.com', pharmacyPassword, 'pharmacy', '9998887776'],
-                ['Test User', 'user@gmail.com', userPassword, 'user', '8887776665']
-            ];
-            await pool.query(`INSERT INTO users (username, email, password, role, contact) VALUES ?`, [values]);
-            console.log("Mock users created.");
+        // 3. Seed Demo Users (ensure required accounts exist even when DB is not empty)
+        const demoUsers = [
+            { username: 'admin', email: 'admin@pharmawave.com', password: await bcrypt.hash('admin123', 10), role: 'admin', contact: '1234567890' },
+            { username: 'agent1', email: 'agent@pharmawave.com', password: await bcrypt.hash('agent123', 10), role: 'delivery', contact: '0987654321' },
+            { username: 'pharmacy1', email: 'contact@citymedical.com', password: await bcrypt.hash('pharmacy123', 10), role: 'pharmacy', contact: '9998887776' },
+            { username: 'Test User', email: 'user@gmail.com', password: await bcrypt.hash('user123', 10), role: 'user', contact: '8887776665' }
+        ];
+
+        for (const user of demoUsers) {
+            const [existing] = await pool.query('SELECT id FROM users WHERE username = ? OR email = ?', [user.username, user.email]);
+            if (existing.length === 0) {
+                await pool.query(
+                    `INSERT INTO users (username, email, password, role, contact) VALUES (?, ?, ?, ?, ?)`,
+                    [user.username, user.email, user.password, user.role, user.contact]
+                );
+            }
         }
+        console.log("Demo users ensured.");
 
         // Seed Products
         const [rows] = await pool.query("SELECT COUNT(*) AS count FROM products");
@@ -219,6 +337,93 @@ function authenticateToken(req, res, next) {
         req.user = user;
         next();
     });
+}
+
+function normalizePhone(value) {
+    if (!value) return '';
+    return String(value).replace(/\D/g, '').slice(-10);
+}
+
+function normalizeIdentifier(value) {
+    return sanitizeText(value).toLowerCase();
+}
+
+function isValidPhone(value) {
+    const digits = normalizePhone(value);
+    return /^\d{10}$/.test(digits) && /^[6-9]/.test(digits);
+}
+
+function isValidEmail(value) {
+    if (typeof value !== 'string') return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function sanitizeText(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeUserProfilePayload(payload = {}) {
+    return {
+        username: sanitizeText(payload.username || payload.userName || ''),
+        full_name: sanitizeText(payload.full_name || payload.fullName || ''),
+        email: sanitizeText(payload.email || ''),
+        contact: normalizePhone(payload.contact || payload.mobile || ''),
+        profile_pic: payload.profile_pic || null
+    };
+}
+
+function validateAddressPayload(payload) {
+    const errors = [];
+    const hasStructuredAddress = Boolean(payload.house_number || payload.street || payload.city || payload.state || payload.pincode);
+    const legacyFullAddress = Boolean((payload.full_address || payload.fullAddress) && !hasStructuredAddress);
+
+    if (legacyFullAddress) {
+        return errors;
+    }
+
+    if (!payload.full_name) errors.push('Full name is required.');
+    if (!payload.mobile) errors.push('A valid 10-digit mobile number is required.');
+    if (!payload.house_number) errors.push('House or flat number is required.');
+    if (!payload.street) errors.push('Street or area is required.');
+    if (!payload.city) errors.push('City is required.');
+    if (!payload.state) errors.push('State is required.');
+    if (!payload.pincode) errors.push('Pincode must be a 6-digit number.');
+
+    if (payload.mobile && !isValidPhone(payload.mobile)) errors.push('A valid 10-digit mobile number is required.');
+    if (payload.pincode && !/^\d{6}$/.test(String(payload.pincode).trim())) errors.push('Pincode must be a 6-digit number.');
+    return errors;
+}
+
+function normalizeAddressRow(row = {}) {
+    const address = { ...row };
+    address.title = row.label || row.title || 'Home';
+    address.label = row.label || row.title || 'Home';
+    address.full_address = row.full_address || buildAddressString({
+        house_number: row.house_number,
+        street: row.street,
+        city: row.city,
+        state: row.state,
+        pincode: row.pincode
+    });
+    return address;
+}
+
+function buildAddressString(address) {
+    const parts = [
+        address.house_number,
+        address.street,
+        address.city,
+        address.state,
+        address.pincode ? `PIN ${address.pincode}` : ''
+    ].filter(Boolean);
+    return parts.join(', ');
+}
+
+function formatDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
 }
 
 // ==========================================
@@ -271,22 +476,10 @@ app.post("/api/auth/google", async (req, res) => {
         });
 
     } catch (err) {
-        // DB is down — issue a session JWT directly from Google profile (demo fallback)
-        console.error("DB unavailable for Google auth, using fallback:", err.message);
-        const username = (name || email.split('@')[0]).replace(/\s+/g, '_');
-        const fallbackToken = jwt.sign(
-            { id: -1, username, role: 'user', email },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-        return res.json({
-            success: true,
-            message: "Google Login successful!",
-            token: fallbackToken,
-            userId: -1,
-            username,
-            profile_pic: picture || null,
-            role: 'user'
+        console.error("Google auth failed:", err.message);
+        return res.status(500).json({
+            success: false,
+            message: "Google sign-in failed. Please try again or use email login."
         });
     }
 });
@@ -296,14 +489,14 @@ app.post("/api/auth/google", async (req, res) => {
 app.post("/api/auth/forgot-password", async (req, res) => {
     try {
         const { role, username, email } = req.body;
-        const identifier = email || username;
+        const identifier = normalizeIdentifier(email || username || '');
 
-        // Find user by username or email
-        let query = "SELECT id, email, username FROM users WHERE (username = ? OR email = ?)";
+        // Find user by username or email in a case-insensitive way
+        let query = "SELECT id, email, username FROM users WHERE (LOWER(username) = ? OR LOWER(email) = ?)";
         const params = [identifier, identifier];
         if (role) {
-            query += " AND role = ?";
-            params.push(role);
+            query += " AND LOWER(role) = ?";
+            params.push(String(role).toLowerCase());
         }
         const [rows] = await pool.query(query, params);
 
@@ -421,22 +614,40 @@ app.post("/api/auth/reset-password", async (req, res) => {
 // REGISTER API
 app.post("/register", async (req, res) => {
     try {
-        const { username, password, contact } = req.body;
+        const { username, password, contact, email, full_name } = req.body;
+        const emailValue = sanitizeText(email || contact || '');
+        const mobileValue = normalizePhone(contact || '');
+        const normalizedUsername = sanitizeText(username);
 
-        if (!username || !password || !contact) {
+        if (!normalizedUsername || !password || (!emailValue && !mobileValue)) {
             return res.status(400).json({ success: false, message: "All fields are required" });
         }
 
+        if (mobileValue && !isValidPhone(mobileValue)) {
+            return res.status(400).json({ success: false, message: "Please enter a valid 10-digit mobile number." });
+        }
+
+        if (emailValue && !isValidEmail(emailValue)) {
+            return res.status(400).json({ success: false, message: "Please enter a valid email address." });
+        }
+
+        const [existingUser] = await pool.query(
+            `SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)`,
+            [normalizedUsername, emailValue || '']
+        );
+
+        if (existingUser.length > 0) {
+            return res.status(400).json({ success: false, message: "Username or email already exists" });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        // The existing DB uses the 'email' column for contact info
-        const query = `INSERT INTO users (username, password, email) VALUES (?, ?, ?)`;
+        const query = `INSERT INTO users (username, password, email, contact, full_name) VALUES (?, ?, ?, ?, ?)`;
 
-        await pool.query(query, [username, hashedPassword, contact]);
+        await pool.query(query, [normalizedUsername, hashedPassword, emailValue || null, mobileValue || null, sanitizeText(full_name || '')]);
 
-        // Generate JWT token upon registration
-        const [newUser] = await pool.query(`SELECT id, role FROM users WHERE username = ?`, [username]);
+        const [newUser] = await pool.query(`SELECT id, role FROM users WHERE LOWER(username) = LOWER(?)`, [normalizedUsername]);
         const token = jwt.sign(
-            { id: newUser[0].id, username: username, role: newUser[0].role || 'user' },
+            { id: newUser[0].id, username: normalizedUsername, role: newUser[0].role || 'user' },
             JWT_SECRET,
             { expiresIn: '24h' }
         );
@@ -459,14 +670,14 @@ app.post("/register", async (req, res) => {
 // LOGIN API — Includes fallback for demo when DB is down
 app.post("/login", async (req, res) => {
     const { email, username, password } = req.body;
-    const loginIdentifier = (email || username || "").toLowerCase();
+    const loginIdentifier = normalizeIdentifier(email || username || "");
 
     if (!loginIdentifier || !password) {
         return res.status(400).json({ success: false, message: "Credentials required" });
     }
 
     try {
-        const query = `SELECT * FROM users WHERE email = ? OR username = ?`;
+        const query = `SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?`;
         const [rows] = await pool.query(query, [loginIdentifier, loginIdentifier]);
 
         if (rows.length > 0) {
@@ -491,27 +702,8 @@ app.post("/login", async (req, res) => {
         // User not found in DB — throw to trigger fallback demo credentials check
         throw new Error("User not found in DB");
     } catch (err) {
-        console.error("Login DB fail, checking fallback:", err.message);
-        
-        // HARDCODED ADMIN FALLBACK (when DB is down)
-        if (loginIdentifier === 'admin@pharmawave.com' && password === 'admin123') {
-            const token = jwt.sign({ id: 999, username: 'Admin', role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
-            return res.json({ success: true, token, userId: 999, username: 'Admin', role: 'admin' });
-        }
-        
-        // HARDCODED AGENT FALLBACK (when DB is down)
-        if (loginIdentifier === 'agent@pharmawave.com' && password === 'agent123') {
-            const token = jwt.sign({ id: 19, username: 'agent1', role: 'delivery' }, JWT_SECRET, { expiresIn: '24h' });
-            return res.json({ success: true, token, userId: 19, username: 'agent1', role: 'delivery' });
-        }
-        
-        // HARDCODED USER FALLBACK (for your existing email)
-        if (loginIdentifier === 'anjanbaira@gmail.com' && password === 'test123') {
-            const token = jwt.sign({ id: 1, username: 'Anjan', role: 'user' }, JWT_SECRET, { expiresIn: '24h' });
-            return res.json({ success: true, token, userId: 1, username: 'Anjan', role: 'user' });
-        }
-
-        res.status(401).json({ success: false, message: "Invalid credentials or system offline." });
+        console.error("Login DB error:", err.message);
+        res.status(401).json({ success: false, message: "Invalid credentials." });
     }
 });
 
@@ -519,8 +711,9 @@ app.post("/login", async (req, res) => {
 app.post("/api/agent/login", async (req, res) => {
     try {
         const { username, password } = req.body;
-        // Support both username and email as login identifiers
-        const [rows] = await pool.query("SELECT * FROM users WHERE username = ? OR email = ?", [username, username]);
+        const identifier = normalizeIdentifier(username || '');
+        // Support both username and email as login identifiers in a case-insensitive way
+        const [rows] = await pool.query("SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?", [identifier, identifier]);
 
         if (rows.length > 0) {
             const user = rows[0];
@@ -568,20 +761,30 @@ app.post("/api/agent/login", async (req, res) => {
 app.post("/api/agent/register", async (req, res) => {
     try {
         const { username, password, contact } = req.body;
+        const normalizedUsername = sanitizeText(username);
 
-        if (!username || !password || !contact) {
+        if (!normalizedUsername || !password || !contact) {
             return res.status(400).json({ success: false, message: "All fields are required" });
+        }
+
+        const [existingUser] = await pool.query(
+            `SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)`,
+            [normalizedUsername, String(contact).trim()]
+        );
+
+        if (existingUser.length > 0) {
+            return res.status(400).json({ success: false, message: "Username or email already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const query = `INSERT INTO users (username, password, email, contact, role) VALUES (?, ?, ?, ?, 'delivery')`;
  
         // Populate both for compatibility
-        await pool.query(query, [username, hashedPassword, contact.includes('@') ? contact : null, contact]);
+        await pool.query(query, [normalizedUsername, hashedPassword, contact.includes('@') ? contact : null, contact]);
 
-        const [newUser] = await pool.query(`SELECT id FROM users WHERE username = ?`, [username]);
+        const [newUser] = await pool.query(`SELECT id FROM users WHERE LOWER(username) = LOWER(?)`, [normalizedUsername]);
         const token = jwt.sign(
-            { id: newUser[0].id, username: username, role: 'delivery' },
+            { id: newUser[0].id, username: normalizedUsername, role: 'delivery' },
             JWT_SECRET,
             { expiresIn: '24h' }
         );
@@ -636,31 +839,104 @@ app.post("/api/orders", authenticateToken, async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { userId, totalAmount, cartItems, addressId, paymentMethod, schedule } = req.body;
+        const { userId, totalAmount, cartItems, addressId, paymentMethod, schedule, deliveryCharge, prescriptionId } = req.body;
 
-        if (!userId || !totalAmount || !cartItems || cartItems.length === 0) {
+        if (!userId || !Array.isArray(cartItems) || cartItems.length === 0) {
             return res.status(400).json({ success: false, message: "Invalid order data" });
         }
 
-        // Insert Order without assigning an agent yet (Pooling model)
-        const orderQuery = `INSERT INTO orders (user_id, total_amount, agent_id, address_id, payment_method, schedule) VALUES (?, ?, NULL, ?, ?, ?)`;
-        const payMethod = paymentMethod || 'COD';
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized order placement." });
+        }
+
+        const [addressRow] = await connection.query("SELECT id FROM addresses WHERE id = ? AND user_id = ?", [addressId, userId]);
+        if (!addressId || addressRow.length === 0) {
+            return res.status(400).json({ success: false, message: "Please select a valid delivery address." });
+        }
+
+        const productIds = [...new Set(cartItems.map(item => Number(item.id)).filter(Boolean))];
+        if (productIds.length === 0) {
+            return res.status(400).json({ success: false, message: "Cart is empty or invalid." });
+        }
+
+        const productPlaceholders = productIds.map(() => '?').join(',');
+        const [products] = await connection.query(`SELECT * FROM products WHERE id IN (${productPlaceholders})`, productIds);
+        const productMap = new Map(products.map(product => [product.id, product]));
+
+        let subtotal = 0;
+        for (const item of cartItems) {
+            const product = productMap.get(Number(item.id));
+            if (!product) {
+                return res.status(400).json({ success: false, message: `Medicine not found: ${item.name || item.id}` });
+            }
+            if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
+                return res.status(400).json({ success: false, message: `Invalid quantity for ${product.name}.` });
+            }
+            if (Number(product.stock) < Number(item.quantity)) {
+                return res.status(400).json({ success: false, message: `Only ${product.stock} units available for ${product.name}.` });
+            }
+            if (Boolean(product.prescription_required) && !prescriptionId) {
+                return res.status(400).json({ success: false, message: `${product.name} requires a prescription before checkout.` });
+            }
+            if (Boolean(product.prescription_required) && prescriptionId) {
+                const [prescriptionRow] = await connection.query("SELECT id FROM prescriptions WHERE id = ? AND user_id = ?", [prescriptionId, userId]);
+                if (prescriptionRow.length === 0) {
+                    return res.status(400).json({ success: false, message: "Selected prescription is invalid or does not belong to this user." });
+                }
+            }
+            const unitPrice = Number(product.price || 0);
+            const itemTotal = unitPrice * Number(item.quantity);
+            subtotal += itemTotal;
+        }
+
+        const safeDeliveryCharge = Number(deliveryCharge || 0);
+        const computedTotal = Number(subtotal) + safeDeliveryCharge;
+        const requestedTotal = Number(totalAmount || 0);
+
+        if (Math.abs(requestedTotal - computedTotal) > 0.01) {
+            return res.status(400).json({ success: false, message: "Order total does not match the cart value. Please refresh and try again." });
+        }
+
+        const orderNumber = `PW${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
+        const payMethod = (paymentMethod || 'COD').toString();
+        const paymentStatus = ["UPI", "Card", "Online", "Stripe"].includes(payMethod) ? 'Paid' : 'Pending';
+        const orderQuery = `INSERT INTO orders (user_id, order_number, subtotal, delivery_charge, total_amount, status, payment_method, payment_status, address_id, prescription_id, schedule) VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?)`;
         const orderSchedule = schedule || 'ASAP';
-        const [orderResult] = await connection.query(orderQuery, [userId, totalAmount, addressId || null, payMethod, orderSchedule]);
+        const [orderResult] = await connection.query(orderQuery, [userId, orderNumber, subtotal.toFixed(2), safeDeliveryCharge.toFixed(2), computedTotal.toFixed(2), payMethod, paymentStatus, addressId || null, prescriptionId || null, orderSchedule]);
         const orderId = orderResult.insertId;
 
-        // Insert Order Items
-        const orderItemsValues = cartItems.map(item => [orderId, item.id, item.quantity, item.price]);
+        const orderItemsValues = cartItems.map(item => {
+            const product = productMap.get(Number(item.id));
+            return [orderId, item.id, Number(item.quantity), Number(product.price || item.price || 0)];
+        });
         const orderItemsQuery = `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`;
         await connection.query(orderItemsQuery, [orderItemsValues]);
 
+        const transactionReference = paymentStatus === 'Paid' ? `TXN-${Date.now()}-${orderId}` : null;
+        await connection.query(
+            "INSERT INTO payments (user_id, order_id, amount, payment_method, payment_status, transaction_reference) VALUES (?, ?, ?, ?, ?, ?)",
+            [userId, orderId, computedTotal.toFixed(2), payMethod, paymentStatus, transactionReference]
+        );
+
+        for (const item of cartItems) {
+            const product = productMap.get(Number(item.id));
+            const qty = Number(item.quantity);
+            const [updateResult] = await connection.query(
+                "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?",
+                [qty, product.id, qty]
+            );
+            if (updateResult.affectedRows === 0) {
+                throw new Error(`Inventory validation failed for ${product.name}`);
+            }
+        }
+
         await connection.commit();
-        io.emit('new_order_pool'); // Alert agents of new order
-        res.json({ success: true, message: "Order placed successfully! Preparing Delivery.", orderId: orderId, assignedAgent: null });
+        io.emit('new_order_pool');
+        res.json({ success: true, message: "Order placed successfully! Preparing Delivery.", orderId, orderNumber, assignedAgent: null });
     } catch (err) {
         await connection.rollback();
         console.error("Order process failed:", err);
-        res.status(500).send({ message: "Server error processing order" });
+        res.status(500).json({ success: false, message: err.message || "Server error processing order" });
     } finally {
         connection.release();
     }
@@ -670,15 +946,18 @@ app.post("/api/orders", authenticateToken, async (req, res) => {
 app.get("/api/orders/user/:id", authenticateToken, async (req, res) => {
     try {
         const userId = req.params.id;
-        // Basic Authorization check
         if (req.user.role !== 'admin' && req.user.id != userId) {
             return res.status(403).json({ success: false, message: "Unauthorized access to these orders" });
         }
         const query = `
-            SELECT o.id, o.total_amount, o.status, o.created_at, 
-                   COUNT(oi.id) as total_items
+            SELECT o.id, o.order_number, o.total_amount, o.subtotal, o.delivery_charge, o.status, o.payment_method, o.payment_status, o.created_at, o.address_id, o.prescription_id,
+                   COUNT(oi.id) as total_items,
+                   a.full_address as delivery_address,
+                   p.file_name as prescription_file
             FROM orders o
             LEFT JOIN order_items oi ON o.id = oi.order_id
+            LEFT JOIN addresses a ON o.address_id = a.id
+            LEFT JOIN prescriptions p ON o.prescription_id = p.id
             WHERE o.user_id = ?
             GROUP BY o.id
             ORDER BY o.created_at DESC
@@ -816,40 +1095,198 @@ app.post("/api/user/:id/username", authenticateToken, async (req, res) => {
         await pool.query("UPDATE users SET username = ? WHERE id = ?", [newUsername.trim(), userId]);
         res.json({ success: true, message: "Username updated!", newUsername: newUsername.trim() });
     } catch (err) {
-        console.error("Username update failed, using fallback:", err.message);
-        // Fallback: Return success to UI so it looks like it worked in the session
-        res.json({ success: true, message: "Username updated (Session only)", newUsername: newUsername.trim() });
+        console.error("Username update failed:", err.message);
+        res.status(500).json({ success: false, message: "Server error updating username." });
     }
 });
 
-// GET USER ADDRESSES — Includes fallback
+// GET USER PROFILE
+app.get("/api/user/:id/profile", authenticateToken, async (req, res) => {
+    const userId = req.params.id;
+    try {
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+        const [rows] = await pool.query(
+            "SELECT id, username, email, contact, full_name, profile_pic, role, email_notifications, sms_alerts FROM users WHERE id = ?",
+            [userId]
+        );
+        if (rows.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+        res.json({ success: true, user: rows[0] });
+    } catch (err) {
+        console.error('Profile fetch failed:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching profile.' });
+    }
+});
+
+app.put("/api/user/:id/profile", authenticateToken, async (req, res) => {
+    const userId = req.params.id;
+    try {
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const payload = normalizeUserProfilePayload(req.body);
+        if (!payload.username) return res.status(400).json({ success: false, message: 'Username is required.' });
+        if (!payload.full_name) return res.status(400).json({ success: false, message: 'Full name is required.' });
+        if (!payload.contact || !isValidPhone(payload.contact)) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number.' });
+        }
+        if (payload.email && !isValidEmail(payload.email)) {
+            return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+        }
+
+        const [existing] = await pool.query("SELECT id, username, email FROM users WHERE (username = ? OR email = ?) AND id != ?", [payload.username, payload.email || '', userId]);
+        if (existing.length > 0) {
+            return res.status(400).json({ success: false, message: 'Username or email is already in use.' });
+        }
+
+        await pool.query(
+            "UPDATE users SET username = ?, full_name = ?, email = ?, contact = ? WHERE id = ?",
+            [payload.username, payload.full_name, payload.email || null, payload.contact, userId]
+        );
+
+        const [updated] = await pool.query("SELECT id, username, email, contact, full_name, profile_pic, role FROM users WHERE id = ?", [userId]);
+        res.json({ success: true, message: 'Profile updated successfully.', user: updated[0] });
+    } catch (err) {
+        console.error('Profile update failed:', err);
+        res.status(500).json({ success: false, message: 'Server error updating profile.' });
+    }
+});
+
+// GET USER ADDRESSES
 app.get("/api/user/:id/addresses", authenticateToken, async (req, res) => {
     const userId = req.params.id;
     try {
-        const [rows] = await pool.query("SELECT * FROM addresses WHERE user_id = ?", [userId]);
-        res.json({ success: true, addresses: rows });
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+        const [rows] = await pool.query("SELECT * FROM addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC", [userId]);
+        res.json({ success: true, addresses: rows.map(normalizeAddressRow) });
     } catch (err) {
-        console.error("Addresses fetch failed, using fallback:", err.message);
-        res.json({ 
-            success: true, 
-            addresses: [
-                { id: 101, title: "Home", full_address: "123 Green Valley, Sector 4, Hyderabad", is_default: true },
-                { id: 102, title: "Office", full_address: "Tech Hub Tower A, Hitech City, Hyderabad", is_default: false }
-            ] 
-        });
+        console.error('Addresses fetch failed:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching addresses.' });
     }
 });
 
-// ADD USER ADDRESS — Includes fallback
+// ADD USER ADDRESS
 app.post("/api/user/:id/addresses", authenticateToken, async (req, res) => {
     const userId = req.params.id;
-    const { title, full_address, is_default } = req.body;
     try {
-        await pool.query("INSERT INTO addresses (user_id, title, full_address, is_default) VALUES (?, ?, ?, ?)", [userId, title, full_address, is_default ? true : false]);
-        res.json({ success: true, message: "Address saved!" });
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const body = req.body || {};
+        console.log('DEBUG_ADDRESS_BODY', JSON.stringify(body));
+        const payload = {
+            full_name: sanitizeText(body.full_name || body.name || ''),
+            mobile: normalizePhone(body.mobile || body.contact || ''),
+            house_number: sanitizeText(body.house_number || body.flat_number || ''),
+            street: sanitizeText(body.street || body.area || ''),
+            city: sanitizeText(body.city || ''),
+            state: sanitizeText(body.state || ''),
+            pincode: sanitizeText(body.pincode || ''),
+            landmark: sanitizeText(body.landmark || ''),
+            title: sanitizeText(body.title || body.label || 'Home'),
+            label: sanitizeText(body.label || body.title || 'Home'),
+            full_address: sanitizeText(body.full_address || body.fullAddress || ''),
+            is_default: Boolean(body.is_default),
+            latitude: body.latitude || null,
+            longitude: body.longitude || null
+        };
+
+        if (!payload.full_name) {
+            const [userRow] = await pool.query('SELECT username, contact FROM users WHERE id = ?', [userId]);
+            payload.full_name = sanitizeText(userRow[0]?.username || 'Customer');
+        }
+        if (!payload.mobile) {
+            const [userRow] = await pool.query('SELECT contact FROM users WHERE id = ?', [userId]);
+            payload.mobile = normalizePhone(userRow[0]?.contact || '');
+        }
+        if (!payload.mobile && payload.full_address) {
+            payload.mobile = '0000000000';
+        }
+
+        const validationErrors = validateAddressPayload(payload);
+        if (validationErrors.length) {
+            return res.status(400).json({ success: false, message: validationErrors[0] });
+        }
+
+        const fullAddress = payload.full_address || buildAddressString(payload);
+
+        if (payload.is_default) {
+            await pool.query('UPDATE addresses SET is_default = FALSE WHERE user_id = ?', [userId]);
+        }
+
+        const [result] = await pool.query(
+            "INSERT INTO addresses (user_id, full_name, mobile, house_number, street, city, state, pincode, landmark, label, full_address, latitude, longitude, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [userId, payload.full_name, payload.mobile, payload.house_number, payload.street, payload.city, payload.state, payload.pincode, payload.landmark, payload.label || payload.title || 'Home', fullAddress, payload.latitude, payload.longitude, payload.is_default ? 1 : 0]
+        );
+
+        res.json({ success: true, message: 'Address saved successfully!', addressId: result.insertId });
     } catch (err) {
-        console.error("Address save failed, using fallback:", err.message);
-        res.json({ success: true, message: "Address saved (Session only)!" });
+        console.error('Address save failed:', err);
+        res.status(500).json({ success: false, message: 'Server error saving address.' });
+    }
+});
+
+app.put("/api/user/:id/addresses/:addressId", authenticateToken, async (req, res) => {
+    const userId = req.params.id;
+    const addressId = req.params.addressId;
+    try {
+        if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const body = req.body || {};
+        const payload = {
+            full_name: sanitizeText(body.full_name || body.name || ''),
+            mobile: normalizePhone(body.mobile || body.contact || ''),
+            house_number: sanitizeText(body.house_number || body.flat_number || ''),
+            street: sanitizeText(body.street || body.area || ''),
+            city: sanitizeText(body.city || ''),
+            state: sanitizeText(body.state || ''),
+            pincode: sanitizeText(body.pincode || ''),
+            landmark: sanitizeText(body.landmark || ''),
+            title: sanitizeText(body.title || body.label || 'Home'),
+            label: sanitizeText(body.label || body.title || 'Home'),
+            full_address: sanitizeText(body.full_address || body.fullAddress || ''),
+            is_default: Boolean(body.is_default),
+            latitude: body.latitude || null,
+            longitude: body.longitude || null
+        };
+
+        if (!payload.full_name) {
+            const [userRow] = await pool.query('SELECT username, contact FROM users WHERE id = ?', [userId]);
+            payload.full_name = sanitizeText(userRow[0]?.username || 'Customer');
+        }
+        if (!payload.mobile) {
+            const [userRow] = await pool.query('SELECT contact FROM users WHERE id = ?', [userId]);
+            payload.mobile = normalizePhone(userRow[0]?.contact || '');
+        }
+        if (!payload.mobile && payload.full_address) {
+            payload.mobile = '0000000000';
+        }
+
+        const validationErrors = validateAddressPayload(payload);
+        if (validationErrors.length) {
+            return res.status(400).json({ success: false, message: validationErrors[0] });
+        }
+
+        if (payload.is_default) {
+            await pool.query('UPDATE addresses SET is_default = FALSE WHERE user_id = ?', [userId]);
+        }
+
+        const fullAddress = payload.full_address || buildAddressString(payload);
+        await pool.query(
+            "UPDATE addresses SET full_name = ?, mobile = ?, house_number = ?, street = ?, city = ?, state = ?, pincode = ?, landmark = ?, label = ?, full_address = ?, latitude = ?, longitude = ?, is_default = ? WHERE id = ? AND user_id = ?",
+            [payload.full_name, payload.mobile, payload.house_number, payload.street, payload.city, payload.state, payload.pincode, payload.landmark, payload.label || payload.title || 'Home', fullAddress, payload.latitude, payload.longitude, payload.is_default ? 1 : 0, addressId, userId]
+        );
+        res.json({ success: true, message: 'Address updated successfully!' });
+    } catch (err) {
+        console.error('Update address failed:', err);
+        res.status(500).json({ success: false, message: 'Server error updating address.' });
     }
 });
 
@@ -858,7 +1295,10 @@ app.delete("/api/user/:id/addresses/:addressId", authenticateToken, async (req, 
     try {
         const { id, addressId } = req.params;
         if (req.user.id != id && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Unauthorized" });
-        await pool.query("DELETE FROM addresses WHERE id = ? AND user_id = ?", [addressId, id]);
+        const [result] = await pool.query("DELETE FROM addresses WHERE id = ? AND user_id = ?", [addressId, id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Address not found.' });
+        }
         res.json({ success: true, message: "Address deleted successfully!" });
     } catch (err) {
         console.error("Delete address failed:", err);
@@ -890,26 +1330,57 @@ app.post("/api/user/:id/prescriptions", authenticateToken, async (req, res) => {
         if (String(req.user.id) !== String(req.params.id)) {
             return res.status(403).json({ success: false, message: "Unauthorized" });
         }
-        const { imageData } = req.body;
+        const body = req.body || {};
+        const { imageData, fileName, mimeType, fileSize } = body;
         if (!imageData) return res.status(400).json({ success: false, message: "No image data provided" });
 
-        await pool.query("INSERT INTO prescriptions (user_id, image_data) VALUES (?, ?)", [req.params.id, imageData]);
-        res.json({ success: true, message: "Prescription uploaded successfully for review!" });
+        const fileType = String(mimeType || 'image/jpeg');
+        if (!/^image\//.test(fileType)) {
+            return res.status(400).json({ success: false, message: 'Only image prescriptions are supported.' });
+        }
+        if (Number(fileSize || 0) > 5 * 1024 * 1024) {
+            return res.status(400).json({ success: false, message: 'Prescription file size must be under 5MB.' });
+        }
+
+        const [result] = await pool.query(
+            "INSERT INTO prescriptions (user_id, file_name, mime_type, file_size, image_data) VALUES (?, ?, ?, ?, ?)",
+            [req.params.id, fileName || 'prescription', fileType, Number(fileSize || 0), imageData]
+        );
+        res.json({ success: true, message: "Prescription uploaded successfully for review!", prescriptionId: result.insertId });
     } catch (err) {
         console.error("Upload prescription failed:", err);
         res.status(500).send({ message: "Server error uploading prescription." });
     }
 });
 
+app.delete("/api/user/:id/prescriptions/:prescriptionId", authenticateToken, async (req, res) => {
+    try {
+        if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+        const [result] = await pool.query('DELETE FROM prescriptions WHERE id = ? AND user_id = ?', [req.params.prescriptionId, req.params.id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Prescription not found.' });
+        }
+        res.json({ success: true, message: 'Prescription deleted.' });
+    } catch (err) {
+        console.error('Delete prescription failed:', err);
+        res.status(500).json({ success: false, message: 'Server error deleting prescription.' });
+    }
+});
+
 // Book Doctor Consultation
 app.post("/api/consultations", authenticateToken, async (req, res) => {
     try {
-        const { userId, doctorName, date, time } = req.body;
+        const { userId, doctorName, date, time, subject } = req.body;
         if (req.user.id != userId) return res.status(403).json({ success: false, message: "Unauthorized" });
         if (!doctorName || !date || !time) return res.status(400).json({ success: false, message: "Missing required fields" });
-        
-        // Mock successful saving of appointment
-        // We'll just return a success payload. In a real db we'd INSERT into a consultations table.
+
+        await pool.query(
+            "INSERT INTO consultations (user_id, doctor_name, subject, date, time) VALUES (?, ?, ?, ?, ?)",
+            [userId, doctorName, subject || 'General Checkup', date, time]
+        );
+
         res.json({ success: true, message: `Appointment confirmed with ${doctorName} on ${date} at ${time}. Link sent to your email!` });
     } catch (err) {
         console.error("Booking failed:", err);
@@ -921,30 +1392,30 @@ app.post("/api/consultations", authenticateToken, async (req, res) => {
 // ADMIN DASHBOARD APIs
 // ==========================================
 
-// Get Dashboard Statistics — Includes fallback
+// Get Dashboard Statistics
 app.get("/api/admin/stats", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
         const [users] = await pool.query("SELECT COUNT(*) as total FROM users WHERE role = 'user'");
-        const [orders] = await pool.query("SELECT COUNT(*) as total FROM orders");
-        const [revenue] = await pool.query("SELECT SUM(total_amount) as total FROM orders WHERE status = 'Delivered'");
-        const [inventory] = await pool.query("SELECT COUNT(*) as low_stock FROM products WHERE stock < 20");
+        const [currentOrders] = await pool.query("SELECT COUNT(*) as total FROM orders WHERE status NOT IN ('Delivered', 'Cancelled')");
+        const [deliveredOrders] = await pool.query("SELECT COUNT(*) as total FROM orders WHERE status = 'Delivered'");
+        const [revenue] = await pool.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status IN ('Delivered', 'Completed')");
+        const [inventory] = await pool.query("SELECT COUNT(*) as low_stock FROM products WHERE stock <= min_stock OR stock < 20");
 
         res.json({
             success: true,
             stats: {
                 totalUsers: users[0].total || 0,
-                totalOrders: orders[0].total || 0,
-                totalRevenue: revenue[0].total || 0,
+                currentOrders: currentOrders[0].total || 0,
+                deliveredOrders: deliveredOrders[0].total || 0,
+                totalOrders: Number(currentOrders[0].total || 0) + Number(deliveredOrders[0].total || 0),
+                totalRevenue: Number(revenue[0].total || 0),
                 lowStockItems: inventory[0].low_stock || 0
             }
         });
     } catch (err) {
-        console.error("Admin stats failed, using fallback:", err.message);
-        res.json({
-            success: true,
-            stats: { totalUsers: 45, totalOrders: 124, totalRevenue: 85400, lowStockItems: 3 }
-        });
+        console.error('Admin stats failed:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching dashboard statistics.' });
     }
 });
 
@@ -952,17 +1423,20 @@ app.get("/api/admin/stats", authenticateToken, async (req, res) => {
 app.get("/api/admin/users", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
-        const [rows] = await pool.query("SELECT id, username, email, contact, role FROM users ORDER BY id DESC");
+        const [rows] = await pool.query(`
+            SELECT u.id, u.username, u.email, u.contact, u.full_name, u.role, u.created_at, 
+                   COUNT(DISTINCT o.id) AS order_count,
+                   COALESCE(SUM(o.total_amount), 0) AS total_spent
+            FROM users u
+            LEFT JOIN orders o ON o.user_id = u.id
+            WHERE u.role = 'user' OR u.role = 'delivery'
+            GROUP BY u.id
+            ORDER BY u.id DESC
+        `);
         res.json({ success: true, users: rows });
     } catch (err) {
-        console.error("Fetch users failed, using fallback:", err.message);
-        res.json({
-            success: true,
-            users: [
-                { id: 1, username: "Anjan (Demo)", email: "anjanbaira@gmail.com", contact: "9876543210", role: "user" },
-                { id: 999, username: "Admin", email: "admin@pharmawave.com", contact: "0000000000", role: "admin" }
-            ]
-        });
+        console.error("Fetch users failed:", err.message);
+        res.status(500).json({ success: false, message: "Server error fetching users." });
     }
 });
 
@@ -1047,10 +1521,12 @@ app.get("/api/admin/orders/:id", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
         const [order] = await pool.query(`
-            SELECT o.*, u.username as customer_name, u.contact as customer_phone, a.full_address 
+            SELECT o.*, u.username as customer_name, u.contact as customer_phone, a.full_address,
+                   p.file_name as prescription_file
             FROM orders o 
             LEFT JOIN users u ON o.user_id = u.id 
             LEFT JOIN addresses a ON o.address_id = a.id
+            LEFT JOIN prescriptions p ON o.prescription_id = p.id
             WHERE o.id = ?
         `, [req.params.id]);
 
@@ -1063,18 +1539,16 @@ app.get("/api/admin/orders/:id", authenticateToken, async (req, res) => {
             WHERE oi.order_id = ?
         `, [req.params.id]);
 
-        // Fetch latest prescription if available
-        const [prescriptions] = await pool.query(`
-            SELECT image_data FROM prescriptions 
-            WHERE user_id = ? 
-            ORDER BY uploaded_at DESC LIMIT 1
-        `, [order[0].user_id]);
+        const [payments] = await pool.query(`
+            SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC
+        `, [req.params.id]);
 
         res.json({ 
             success: true, 
             order: order[0], 
             items,
-            prescription: prescriptions.length > 0 ? prescriptions[0].image_data : null 
+            payments,
+            prescription: order[0]?.prescription_file || null
         });
     } catch (err) {
         console.error("Fetch order detail failed:", err);
@@ -1332,13 +1806,8 @@ app.get("/api/delivery/pool", authenticateToken, async (req, res) => {
         `);
         res.json({ success: true, orders: orders });
     } catch (err) {
-        console.error("Fetch pool orders failed, using fallback:", err.message);
-        res.json({
-            success: true,
-            orders: [
-                { id: 1024, total_amount: 550.00, status: 'Ready for Delivery', payment_method: 'COD', customer_name: 'Demo Customer', customer_phone: '9876543210', full_address: 'Banjara Hills, Hyderabad' }
-            ]
-        });
+        console.error("Fetch pool orders failed:", err.message);
+        res.status(500).json({ success: false, message: "Server error fetching delivery orders." });
     }
 });
 
@@ -1473,21 +1942,10 @@ app.get("/api/orders/:id/track", authenticateToken, async (req, res) => {
         `, [orderId, req.user.id, req.user.id, req.user.role]);
         
         if (rows.length > 0) return res.json({ success: true, tracking: rows[0] });
-        throw new Error("Tracking info not found or DB down");
+        return res.status(404).json({ success: false, message: "Tracking info not found for this order." });
     } catch (err) {
-        console.error("Tracking failed, using fallback:", err.message);
-        // Fallback: Simulated tracking for demo
-        res.json({
-            success: true,
-            tracking: {
-                id: orderId,
-                status: 'Out for Delivery',
-                agent_name: 'John Smith (Demo)',
-                agent_phone: '+91 98765 43210',
-                lat: 17.4483, // Mock Hyderabad coordinates
-                lng: 78.3915
-            }
-        });
+        console.error("Tracking failed:", err.message);
+        res.status(500).json({ success: false, message: "Server error fetching tracking information." });
     }
 });
 
@@ -1605,7 +2063,8 @@ app.get("/api/user/:id/cart", authenticateToken, async (req, res) => {
         }
         const [rows] = await pool.query("SELECT cart_data FROM users WHERE id = ?", [userId]);
         if (rows.length > 0) {
-            res.json({ success: true, cart: rows[0].cart_data ? JSON.parse(rows[0].cart_data) : [] });
+            const cart = rows[0].cart_data ? JSON.parse(rows[0].cart_data) : [];
+            res.json({ success: true, cart: Array.isArray(cart) ? cart : [] });
         } else {
             res.status(404).json({ success: false, message: "User not found" });
         }

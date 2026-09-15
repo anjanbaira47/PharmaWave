@@ -69,21 +69,6 @@
 
             } catch (err) {
                 console.error("Login process error:", err);
-                
-                // CLIENT-SIDE FALLBACK FOR GOOGLE LOGIN (If server is down)
-                if (userData && userData.email) {
-                    showToast("Server unreachable. Entering Offline Demo Mode...", "success");
-                    localStorage.setItem('pharmaUser', JSON.stringify({
-                        userId: 1,
-                        username: userData.displayName || userData.email.split('@')[0],
-                        profile_pic: userData.photoURL,
-                        role: 'user',
-                        token: 'offline-google-demo-token'
-                    }));
-                    setTimeout(() => { window.location.href = "index.html"; }, 1500);
-                    return;
-                }
-
                 showToast("Sign-In failed: " + (err.message || "Unknown error"), "error");
             }
         };
@@ -230,38 +215,6 @@
             loginBtn.textContent = 'Authenticating...';
             loginBtn.disabled = true;
 
-            // Shared offline demo fallback — runs on BOTH server errors AND network failures
-            function tryOfflineFallback(reason) {
-                if (email === 'admin@pharmawave.com' && password === 'admin123') {
-                    showToast("Server unreachable. Entering Offline Admin Mode...", "success");
-                    localStorage.setItem('pharmaUser', JSON.stringify({
-                        userId: 999, username: 'Admin (Offline)', role: 'admin', token: 'offline-demo-token'
-                    }));
-                    loginBtn.textContent = 'Success!';
-                    setTimeout(() => { window.location.href = "AdminDashboard.html"; }, 2000);
-                    return true;
-                }
-                if (email === 'agent@pharmawave.com' && password === 'agent123') {
-                    showToast("Server unreachable. Entering Offline Agent Mode...", "success");
-                    localStorage.setItem('pharmaUser', JSON.stringify({
-                        userId: 19, username: 'agent1 (Offline)', role: 'delivery', token: 'offline-demo-token'
-                    }));
-                    loginBtn.textContent = 'Success!';
-                    setTimeout(() => { window.location.href = "DeliveryDashboard.html"; }, 2000);
-                    return true;
-                }
-                if ((email === 'anjanbaira@gmail.com' || email === 'user@gmail.com') && (password === 'test123' || password === 'user123')) {
-                    showToast("Server unreachable. Entering Offline User Mode...", "success");
-                    localStorage.setItem('pharmaUser', JSON.stringify({
-                        userId: 1, username: 'Anjan (Offline)', role: 'user', token: 'offline-demo-token'
-                    }));
-                    loginBtn.textContent = 'Success!';
-                    setTimeout(() => { window.location.href = "index.html"; }, 2000);
-                    return true;
-                }
-                return false;
-            }
-
             try {
                 const response = await fetch(`${API_BASE}/login`, {
                     method: "POST",
@@ -293,21 +246,15 @@
                         window.location.href = destination;
                     }, 2000);
                 } else {
-                    // Server responded but with an error (4xx/5xx) — try demo fallback first
-                    if (!tryOfflineFallback('server_error')) {
-                        showToast(data.message || "Invalid credentials. Please try again.", "error");
-                        loginBtn.textContent = 'Login securely';
-                        loginBtn.disabled = false;
-                    }
-                }
-            } catch (err) {
-                console.error(err);
-                // Network/timeout error — try demo fallback
-                if (!tryOfflineFallback('network_error')) {
-                    showToast("Server connection error. Please try again later.", "error");
+                    showToast(data.message || "Invalid credentials. Please try again.", "error");
                     loginBtn.textContent = 'Login securely';
                     loginBtn.disabled = false;
                 }
+            } catch (err) {
+                console.error(err);
+                showToast("Server connection error. Please try again later.", "error");
+                loginBtn.textContent = 'Login securely';
+                loginBtn.disabled = false;
             }
         });
     </script>

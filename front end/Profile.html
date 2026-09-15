@@ -17,7 +17,7 @@
             max-width: 1100px;
             margin: 120px auto 60px auto;
             display: grid;
-            grid-template-columns: 320px 1fr;
+            grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
             gap: 40px;
             padding: 0 20px;
             position: relative;
@@ -33,6 +33,7 @@
             padding: 40px 30px;
             box-shadow: var(--shadow-lg), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
             height: fit-content;
+            min-width: 0;
         }
 
         .avatar-section {
@@ -134,6 +135,7 @@
             padding: 50px;
             box-shadow: var(--shadow-lg);
             min-height: 600px;
+            min-width: 0;
         }
 
         .tab-content {
@@ -234,6 +236,27 @@
 
         .setting-row:last-child {
             border-bottom: none;
+        }
+        /* Prevent long names from overflowing containers */
+        .avatar-section h3 {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        #infoUsername {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Ensure flex children can shrink properly */
+        .flex-shrink-0 {
+            min-width: 0;
+            flex: 1 1 auto;
         }
     </style>
 </head>
@@ -374,23 +397,23 @@
                 <h2 class="panel-title"><ion-icon name="id-card" style="color: var(--primary);"></ion-icon> Personal
                     Information</h2>
                 <div class="info-grid">
-                    <div class="info-card">
+                    <div class="info-card" style="min-width: 0;">
                         <label>Username</label>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; width:100%; min-width:0;">
                             <p id="infoUsername"
-                                style="margin-top: 0; font-size: 22px; font-weight: 800; color: var(--text-main); line-height: 1;">
+                                style="margin-top: 0; font-size: 22px; font-weight: 800; color: var(--text-main); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%;">
                                 Loading...</p>
                             <button id="editUsernameBtn" onclick="toggleUsernameEdit()"
-                                style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: background 0.2s;">
+                                style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: background 0.2s; flex-shrink: 0;">
                                 <ion-icon name="pencil" style="font-size: 16px;"></ion-icon>
                             </button>
                         </div>
-                        <div id="editUsernameContainer" style="display: none; margin-top: 10px; gap: 10px;">
+                        <div id="editUsernameContainer" style="display: none; margin-top: 10px; gap: 10px; align-items: center; width:100%; min-width:0; flex-wrap: wrap;">
                             <input type="text" id="newUsernameInput" placeholder="New Username"
-                                style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; width: 100%; max-width: 180px;">
-                            <button onclick="saveUsername()"
+                                style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; width: min(420px, 100%); min-width: 0; box-sizing: border-box;">
+                            <button type="button" onclick="saveUsername()"
                                 style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s;">Save</button>
-                            <button onclick="toggleUsernameEdit()"
+                            <button type="button" onclick="toggleUsernameEdit()"
                                 style="background: var(--surface); color: var(--text-muted); border: 1px solid var(--border-dark); padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">Cancel</button>
                         </div>
                     </div>
@@ -410,6 +433,31 @@
                     </div>
                 </div>
 
+                <div style="margin-top: 28px; background: rgba(15, 23, 42, 0.02); border: 1px solid var(--border-dark); border-radius: 20px; padding: 20px; max-width: 900px;">
+                    <h3 style="margin: 0 0 18px; color: var(--text-main); font-weight: 900;">Profile Details</h3>
+                    <form id="profileDetailsForm" novalidate>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+                            <div>
+                                <label for="profileFullName" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Full Name <span style="color:#ef4444;">*</span></label>
+                                <input id="profileFullName" type="text" maxlength="80" style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="Enter full name" />
+                            </div>
+                            <div>
+                                <label for="profileEmail" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Email</label>
+                                <input id="profileEmail" type="email" maxlength="120" style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="mail@example.com" />
+                            </div>
+                            <div>
+                                <label for="profileMobile" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Mobile Number <span style="color:#ef4444;">*</span></label>
+                                <input id="profileMobile" type="tel" inputmode="numeric" maxlength="10" style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="10-digit mobile number" />
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:flex-end; margin-top: 20px; gap: 12px; flex-wrap: wrap;">
+                            <button type="button" onclick="loadProfileDetails()" style="background: white; border: 1px solid var(--border-dark); color: var(--text-main); padding: 12px 18px; border-radius: 12px; font-weight: 700; cursor: pointer;">Reset</button>
+                            <button type="submit" id="saveProfileBtn" style="background: var(--primary); color: white; border: none; padding: 12px 22px; border-radius: 12px; font-weight: 800; cursor: pointer;">Save Details</button>
+                        </div>
+                    </form>
+                </div>
+
             </div>
 
             <!-- ADDRESSES TAB -->
@@ -424,21 +472,53 @@
                 <div
                     style="background: rgba(16, 185, 129, 0.05); padding: 24px; border-radius: 20px; border: 1px dashed var(--primary); margin-top: 20px;">
                     <h3 style="margin-top:0; color: var(--text-main); font-weight: 800;">Add New Address</h3>
-                    <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
-                        <input type="text" id="newAddrTitle" placeholder="Address Title (e.g. Home, Office)"
-                            style="padding: 12px; border-radius: 12px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; width: 100%; max-width: 400px;">
-                        <textarea id="newAddrFull" placeholder="Full Delivery Address" rows="3"
-                            style="padding: 12px; border-radius: 12px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; width: 100%; max-width: 400px; resize: none;"></textarea>
-                        <label
-                            style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text-main); cursor: pointer; width: fit-content;">
-                            <input type="checkbox" id="newAddrDefault"
-                                style="width: 18px; height: 18px; accent-color: var(--primary);">
+                    <form id="addAddressForm" novalidate style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px; max-width: 900px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+                            <div>
+                                <label for="newAddrFullName" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Full Name <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrFullName" type="text" maxlength="80" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="Receiver name" />
+                            </div>
+                            <div>
+                                <label for="newAddrMobile" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Mobile Number <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrMobile" type="tel" inputmode="numeric" maxlength="10" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="10-digit mobile" />
+                            </div>
+                            <div>
+                                <label for="newAddrTitle" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Address Label</label>
+                                <input id="newAddrTitle" type="text" maxlength="50" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="Home / Work" />
+                            </div>
+                            <div>
+                                <label for="newAddrHouse" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">House / Flat No. <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrHouse" type="text" maxlength="100" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="123/4" />
+                            </div>
+                            <div>
+                                <label for="newAddrStreet" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Street / Area <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrStreet" type="text" maxlength="255" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="Main Road, Sector" />
+                            </div>
+                            <div>
+                                <label for="newAddrCity" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">City <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrCity" type="text" maxlength="120" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="City" />
+                            </div>
+                            <div>
+                                <label for="newAddrState" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">State <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrState" type="text" maxlength="120" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="State" />
+                            </div>
+                            <div>
+                                <label for="newAddrPincode" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Pincode <span style="color:#ef4444;">*</span></label>
+                                <input id="newAddrPincode" type="text" inputmode="numeric" maxlength="6" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="6 digits" />
+                            </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label for="newAddrLandmark" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Landmark</label>
+                                <input id="newAddrLandmark" type="text" maxlength="255" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="Near school / hospital / market" />
+                            </div>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text-main); cursor: pointer; width: fit-content;">
+                            <input type="checkbox" id="newAddrDefault" name="is_default" style="width: 18px; height: 18px; accent-color: var(--primary);">
                             Set as Default
                         </label>
-                        <button onclick="saveNewAddress()"
-                            style="background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: fit-content; margin-top: 5px;">Save
-                            Address</button>
-                    </div>
+                        <div>
+                            <button type="submit" id="saveAddrBtn" style="background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: fit-content; margin-top: 5px;">Save Address</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -676,6 +756,35 @@
             document.getElementById('navAvatar').src = currentUser.profile_pic;
             document.getElementById('navAvatar').style.display = 'block';
             document.getElementById('navIcon').style.display = 'none';
+        }
+
+        // ENTER key submits for username edit
+        const usernameInputEl = document.getElementById('newUsernameInput');
+        if (usernameInputEl) {
+            usernameInputEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveUsername();
+                }
+            });
+        }
+
+        // Profile form submit (supports ENTER)
+        const profileDetailsForm = document.getElementById('profileDetailsForm');
+        if (profileDetailsForm) {
+            profileDetailsForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                saveProfileDetails();
+            });
+        }
+
+        // Address form submit (supports ENTER)
+        const addAddrForm = document.getElementById('addAddressForm');
+        if (addAddrForm) {
+            addAddrForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                saveNewAddress();
+            });
         }
 
         // Switch content tabs
@@ -1025,6 +1134,87 @@
             }
         }
 
+        async function loadProfileDetails() {
+            try {
+                const response = await fetch(`${API_BASE}/api/user/${currentUser.userId}/profile`, { headers: getAuthHeaders() });
+                const data = await response.json();
+                if (!data.success || !data.user) {
+                    showToast(data.message || 'Failed to load profile details.', 'error');
+                    return;
+                }
+
+                const user = data.user;
+                document.getElementById('profileFullName').value = user.full_name || '';
+                document.getElementById('profileEmail').value = user.email || '';
+                document.getElementById('profileMobile').value = user.contact || '';
+                document.getElementById('newUsernameInput').value = user.username || currentUser.username;
+                document.getElementById('infoUsername').textContent = user.username || currentUser.username;
+                document.getElementById('sidebarName').textContent = user.username || currentUser.username;
+                currentUser.username = user.username || currentUser.username;
+                currentUser.full_name = user.full_name || currentUser.full_name || '';
+                currentUser.email = user.email || currentUser.email || '';
+                currentUser.contact = user.contact || currentUser.contact || '';
+                localStorage.setItem('pharmaUser', JSON.stringify(currentUser));
+            } catch (err) {
+                console.error('Profile load failed:', err);
+                showToast('Unable to fetch the profile details right now.', 'error');
+            }
+        }
+
+        async function saveProfileDetails() {
+            const fullName = document.getElementById('profileFullName').value.trim();
+            const email = document.getElementById('profileEmail').value.trim();
+            const contact = document.getElementById('profileMobile').value.trim();
+            const saveBtn = document.getElementById('saveProfileBtn');
+
+            if (!fullName || !contact) {
+                showToast('Full name and mobile are required.', 'error');
+                return;
+            }
+
+            const payload = {
+                username: currentUser.username,
+                full_name: fullName,
+                email: email || '',
+                contact: contact,
+                userName: currentUser.username,
+            };
+
+            try {
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = 'Saving...';
+                }
+
+                const response = await fetch(`${API_BASE}/api/user/${currentUser.userId}/profile`, {
+                    method: 'PUT',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    showToast(data.message || 'Unable to save profile details.', 'error');
+                    return;
+                }
+
+                currentUser.full_name = fullName;
+                currentUser.email = email || currentUser.email || '';
+                currentUser.contact = contact;
+                localStorage.setItem('pharmaUser', JSON.stringify(currentUser));
+                document.getElementById('infoUsername').textContent = currentUser.username;
+                showToast('Profile details saved successfully!', 'success');
+            } catch (err) {
+                console.error('Profile save failed:', err);
+                showToast('Connection error while saving profile details.', 'error');
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Details';
+                }
+            }
+        }
+
         // Load Orders
         async function fetchOrders() {
             const container = document.getElementById('ordersContainer');
@@ -1084,12 +1274,14 @@
                     if (data.addresses.length > 0) {
                         container.innerHTML = '';
                         data.addresses.forEach(addr => {
+                            const title = addr.title || addr.label || 'Home';
+                            const fullAddress = addr.full_address || addr.fullAddress || 'Address not available';
                             const defaultBadge = addr.is_default ? `<span style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; margin-left: 10px;">DEFAULT</span>` : '';
                             container.innerHTML += `
                                 <div class="order-card" style="align-items: flex-start; margin-bottom: 15px; padding: 20px;">
                                     <div style="flex: 1;">
-                                        <h4 style="margin: 0 0 8px 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center;">${addr.title} ${defaultBadge}</h4>
-                                        <p style="margin: 0; color: var(--text-muted); font-size: 15px; line-height: 1.5;">${addr.full_address}</p>
+                                        <h4 style="margin: 0 0 8px 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center;">${title} ${defaultBadge}</h4>
+                                        <p style="margin: 0; color: var(--text-muted); font-size: 15px; line-height: 1.5;">${fullAddress}</p>
                                     </div>
                                     <button onclick="deleteAddress(${addr.id})" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
                                         <ion-icon name="trash" style="font-size: 18px;"></ion-icon>
@@ -1112,33 +1304,54 @@
         }
 
         async function saveNewAddress() {
-            const title = document.getElementById('newAddrTitle').value.trim();
-            const full_address = document.getElementById('newAddrFull').value.trim();
+            const full_name = document.getElementById('newAddrFullName').value.trim();
+            const mobile = document.getElementById('newAddrMobile').value.trim();
+            const label = document.getElementById('newAddrTitle').value.trim() || 'Home';
+            const house_number = document.getElementById('newAddrHouse').value.trim();
+            const street = document.getElementById('newAddrStreet').value.trim();
+            const city = document.getElementById('newAddrCity').value.trim();
+            const state = document.getElementById('newAddrState').value.trim();
+            const pincode = document.getElementById('newAddrPincode').value.trim();
+            const landmark = document.getElementById('newAddrLandmark').value.trim();
             const is_default = document.getElementById('newAddrDefault').checked;
 
-            if (!title || !full_address) {
-                showToast("Please provide both a Title and Full Address.", "error"); return;
+            if (!full_name || !mobile || !house_number || !street || !city || !state || !pincode) {
+                showToast('Please fill all required address fields.', 'error');
+                return;
             }
 
+            const saveBtn = document.getElementById('saveAddrBtn');
+            const origText = saveBtn ? saveBtn.textContent : '';
             try {
+                if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+
                 const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/addresses`, {
                     method: 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ title, full_address, is_default })
+                    body: JSON.stringify({ full_name, mobile, label, house_number, street, city, state, pincode, landmark, is_default })
                 });
                 const data = await res.json();
 
                 if (data.success) {
-                    showToast("Address saved successfully!", "success");
+                    showToast('Address saved successfully!', 'success');
+                    document.getElementById('newAddrFullName').value = '';
+                    document.getElementById('newAddrMobile').value = '';
                     document.getElementById('newAddrTitle').value = '';
-                    document.getElementById('newAddrFull').value = '';
+                    document.getElementById('newAddrHouse').value = '';
+                    document.getElementById('newAddrStreet').value = '';
+                    document.getElementById('newAddrCity').value = '';
+                    document.getElementById('newAddrState').value = '';
+                    document.getElementById('newAddrPincode').value = '';
+                    document.getElementById('newAddrLandmark').value = '';
                     document.getElementById('newAddrDefault').checked = false;
                     fetchAddresses();
                 } else {
-                    showToast(data.message, "error");
+                    showToast(data.message, 'error');
                 }
             } catch (e) {
-                showToast("Connection error while saving address.", "error");
+                showToast('Connection error while saving address.', 'error');
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = origText; }
             }
         }
 
@@ -1228,6 +1441,17 @@
             const file = fileInput.files[0];
             if (!file) return;
 
+            if (!file.type.startsWith('image/')) {
+                showToast("Please select an image prescription.", "error");
+                fileInput.value = '';
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showToast("Prescription must be under 5MB.", "error");
+                fileInput.value = '';
+                return;
+            }
+
             showToast("Processing image...", "success");
 
             // Convert to Base64
@@ -1240,7 +1464,12 @@
                     const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/prescriptions`, {
                         method: 'POST',
                         headers: getAuthHeaders(),
-                        body: JSON.stringify({ imageData: base64Image })
+                        body: JSON.stringify({
+                            imageData: base64Image,
+                            fileName: file.name,
+                            mimeType: file.type,
+                            fileSize: file.size
+                        })
                     });
 
                     const data = await res.json();
