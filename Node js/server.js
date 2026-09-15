@@ -431,32 +431,40 @@ function formatDate(value) {
 // ==========================================
 // GOOGLE AUTH API — Auto-provisions users + DB-failure fallback (always works for demo)
 app.post("/api/auth/google", async (req, res) => {
-    const { email, name, picture } = req.body;
+    const { idToken, email, name, picture } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ success: false, message: "No Google email provided." });
+    if (!idToken) {
+        return res.status(400).json({ success: false, message: "Google verification token is required." });
     }
 
     try {
-        let [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const verifiedEmail = String(decodedToken.email || '').trim().toLowerCase();
+        if (!verifiedEmail || decodedToken.email_verified === false) {
+            return res.status(401).json({ success: false, message: "Google account email is not verified." });
+        }
+        const verifiedName = decodedToken.name || name || verifiedEmail.split('@')[0];
+        const verifiedPicture = decodedToken.picture || picture || null;
+        let [rows] = await pool.query("SELECT * FROM users WHERE LOWER(email) = ?", [verifiedEmail]);
         let user;
 
         if (rows.length > 0) {
             // Existing user — update pic if missing
             user = rows[0];
-            if (!user.profile_pic && picture) {
-                await pool.query("UPDATE users SET profile_pic = ? WHERE id = ?", [picture, user.id]);
-                user.profile_pic = picture;
+            if (!user.profile_pic && verifiedPicture) {
+                await pool.query("UPDATE users SET profile_pic = ? WHERE id = ?", [verifiedPicture, user.id]);
+                user.profile_pic = verifiedPicture;
             }
         } else {
             // Auto-provision: create a new account for this Google user
-            const username = (name || email.split('@')[0]).replace(/\s+/g, '_');
+            const usernameBase = verifiedName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 240) || verifiedEmail.split('@')[0];
+            const username = `${usernameBase}_${Date.now().toString(36)}`.slice(0, 255);
             const tempPassword = await bcrypt.hash(require('crypto').randomBytes(16).toString('hex'), 10);
             const [result] = await pool.query(
                 "INSERT INTO users (username, email, password, profile_pic, role) VALUES (?, ?, ?, ?, 'user')",
-                [username, email, tempPassword, picture || null]
+                [username, verifiedEmail, tempPassword, verifiedPicture]
             );
-            user = { id: result.insertId, username, email, profile_pic: picture || null, role: 'user' };
+            user = { id: result.insertId, username, email: verifiedEmail, profile_pic: verifiedPicture, role: 'user' };
         }
 
         const jwtToken = jwt.sign(
@@ -615,8 +623,9 @@ app.post("/api/auth/reset-password", async (req, res) => {
 app.post("/register", async (req, res) => {
     try {
         const { username, password, contact, email, full_name } = req.body;
-        const emailValue = sanitizeText(email || contact || '');
-        const mobileValue = normalizePhone(contact || '');
+        const rawContact = sanitizeText(contact || '');
+        const emailValue = sanitizeText(email || (rawContact.includes('@') ? rawContact : ''));
+        const mobileValue = email ? normalizePhone(rawContact) : (rawContact.includes('@') ? '' : normalizePhone(rawContact));
         const normalizedUsername = sanitizeText(username);
 
         if (!normalizedUsername || !password || (!emailValue && !mobileValue)) {
@@ -1045,7 +1054,7 @@ app.post("/api/agent/profile/:id", authenticateToken, async (req, res) => {
 
         const query = `
             UPDATE users 
-            SET username = ?, email = ?, vehicle_type = ?, vehicle_number = ?, availability = ? 
+            SET username = ?, contact = ?, vehicle_type = ?, vehicle_number = ?, availability = ?
             WHERE id = ?
         `;
         await pool.query(query, [username, phone, vehicle_type, vehicle_number, availability || 'Online', userId]);
@@ -1063,7 +1072,16 @@ app.post("/api/agent/profile/:id", authenticateToken, async (req, res) => {
 // UPDATE USER AVATAR
 app.post("/api/user/:id/avatar", async (req, res) => {
     try {
+        const authHeader = req.headers.authorization || '';
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+        if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
+        const authenticatedUser = await new Promise((resolve, reject) => {
+            jwt.verify(token, JWT_SECRET, (err, user) => err ? reject(err) : resolve(user));
+        });
         const userId = req.params.id;
+        if (String(authenticatedUser.id) !== String(userId) && authenticatedUser.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
         const { avatarDataUrl } = req.body; // Base64 image
 
         if (!avatarDataUrl) {
@@ -1738,7 +1756,9 @@ app.put("/api/pharmacy/orders/:id/status", authenticateToken, async (req, res) =
 // Get Specific Order with Items
 app.get("/api/orders/:id", authenticateToken, async (req, res) => {
     try {
-        const [orders] = await pool.query("SELECT * FROM orders WHERE id = ?", [req.params.id]);
+        const orderScope = req.user.role === 'admin' ? '' : ' AND user_id = ?';
+        const orderParams = req.user.role === 'admin' ? [req.params.id] : [req.params.id, req.user.id];
+        const [orders] = await pool.query(`SELECT * FROM orders WHERE id = ?${orderScope}`, orderParams);
         if (orders.length === 0) return res.status(404).json({ success: false, message: "Order not found" });
 
         const [items] = await pool.query(`
@@ -1862,7 +1882,10 @@ app.put("/api/delivery/order/:id/status", authenticateToken, async (req, res) =>
         if (req.user.role !== 'delivery' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Delivery access required" });
         const { status, lat, lng } = req.body; 
         if (!status) return res.status(400).json({ success: false, message: "Status required" });
-        await pool.query("UPDATE orders SET status = ? WHERE id = ? AND agent_id = ?", [status, req.params.id, req.user.id]);
+        const [updateResult] = await pool.query("UPDATE orders SET status = ? WHERE id = ? AND agent_id = ?", [status, req.params.id, req.user.id]);
+        if (updateResult.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: "Assigned delivery order not found." });
+        }
         
         const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [req.params.id]);
         if (rows.length > 0) {
@@ -1916,6 +1939,24 @@ app.delete("/api/user/:userId/cards/:cardId", authenticateToken, async (req, res
         res.json({ success: true, message: "Card removed" });
     } catch (err) {
         res.status(500).json({ success: false, message: "Error deleting card" });
+    }
+});
+
+app.get("/api/user/:id/payments", authenticateToken, async (req, res) => {
+    try {
+        if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        const [payments] = await pool.query(`
+            SELECT id, order_id, amount, payment_method, payment_status, transaction_reference, created_at
+            FROM payments
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+        `, [req.params.id]);
+        res.json({ success: true, payments });
+    } catch (err) {
+        console.error('Fetch payment history failed:', err);
+        res.status(500).json({ success: false, message: 'Error fetching payment history' });
     }
 });
 

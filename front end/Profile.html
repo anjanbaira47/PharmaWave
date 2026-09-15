@@ -805,6 +805,7 @@
 
             // Trigger fetches
             if (tabId === 'order-history') fetchOrders();
+            if (tabId === 'payment-history') fetchPaymentHistory();
             if (tabId === 'addresses') fetchAddresses();
             if (tabId === 'prescriptions') fetchPrescriptions();
             if (tabId === 'save-card') fetchCards();
@@ -1260,6 +1261,33 @@
                 }
             } catch (err) {
                 container.innerHTML = '<p style="color: #ef4444; font-weight: 600;">System error fetching orders.</p>';
+            }
+        }
+
+        async function fetchPaymentHistory() {
+            const container = document.getElementById('paymentsContainer');
+            try {
+                const response = await fetch(`${API_BASE}/api/user/${currentUser.userId}/payments`, { headers: getAuthHeaders() });
+                const data = await response.json();
+                if (!data.success || data.payments.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted); font-weight: 500;">No payment history recorded yet.</p>';
+                    return;
+                }
+                container.innerHTML = data.payments.map(payment => `
+                    <div class="order-card" style="margin-bottom: 15px;">
+                        <div>
+                            <p style="font-weight: 800; margin: 0;">Order #${payment.order_id}</p>
+                            <p style="color: var(--text-muted); margin: 6px 0 0;">${new Date(payment.created_at).toLocaleString()} · ${payment.payment_method}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="font-weight: 900; color: var(--primary); margin: 0;">₹${Number(payment.amount).toFixed(2)}</p>
+                            <span style="font-size: 12px; font-weight: 800; color: ${payment.payment_status === 'Paid' ? '#059669' : '#d97706'};">${payment.payment_status}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Payment history load failed:', error);
+                container.innerHTML = '<p style="color: #ef4444; font-weight: 600;">Unable to load payment history.</p>';
             }
         }
 

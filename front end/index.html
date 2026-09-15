@@ -183,6 +183,14 @@
             </div>
 
             <div style="margin-bottom: 20px;">
+                <label for="checkoutPrescription" style="font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase;">Prescription (if required)</label>
+                <select id="checkoutPrescription" style="width: 100%; padding: 12px; margin-top: 8px; border-radius: 12px; border: 1px solid var(--border-dark); font-size: 15px; outline: none; background: var(--surface);">
+                    <option value="">No prescription selected</option>
+                </select>
+                <a href="Profile.html" style="font-size: 12px; color: var(--primary); font-weight: 700; text-decoration: none; margin-top: 5px; display: inline-block;">+ Save a prescription</a>
+            </div>
+
+            <div style="margin-bottom: 20px;">
                 <label
                     style="font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase;">Delivery
                     Timing</label>
@@ -203,11 +211,6 @@
                         style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
                         <input type="radio" name="paymentMethod" value="COD" checked
                             style="accent-color: var(--primary);"> COD
-                    </label>
-                    <label
-                        style="flex: 1; padding: 12px; border: 1px solid var(--border-dark); border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
-                        <input type="radio" name="paymentMethod" value="Wallet" style="accent-color: var(--primary);">
-                        Wallet
                     </label>
                 </div>
             </div>
@@ -325,6 +328,7 @@
                 authBtn.style.gap = '8px';
 
                 await fetchUserAddresses();
+                await fetchCheckoutPrescriptions();
                 await fetchCartFromServer();
             }
         }
@@ -397,6 +401,27 @@
                 }
             } catch (e) {
                 console.error("Failed to load addresses", e);
+            }
+        }
+
+        async function fetchCheckoutPrescriptions() {
+            if (!currentUser) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/prescriptions`, {
+                    headers: { 'Authorization': `Bearer ${currentUser.token || ''}` }
+                });
+                const data = await res.json();
+                if (!data.success) return;
+                const select = document.getElementById('checkoutPrescription');
+                select.innerHTML = '<option value="">No prescription selected</option>';
+                data.prescriptions.forEach(prescription => {
+                    const option = document.createElement('option');
+                    option.value = prescription.id;
+                    option.textContent = `Prescription #${prescription.id} (${prescription.status || 'Pending Review'})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load prescriptions', error);
             }
         }
 
@@ -668,6 +693,7 @@
 
             const schedule = document.getElementById('checkoutSchedule').value;
             const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+            const prescriptionId = document.getElementById('checkoutPrescription').value || null;
             const isSubscribed = document.getElementById('subscribeToggle').checked;
 
             checkoutBtn.textContent = 'Processing...';
@@ -688,6 +714,7 @@
                         totalAmount: total,
                         cartItems: cart,
                         addressId: addressId,
+                        prescriptionId,
                         paymentMethod: paymentMethod === 'UPI' ? 'Online (Pending)' : paymentMethod,
                         schedule: schedule
                     })

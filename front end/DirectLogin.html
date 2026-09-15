@@ -45,6 +45,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        idToken: await userData.getIdToken(),
                         email: userData.email,
                         name: userData.displayName,
                         picture: userData.photoURL

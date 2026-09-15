@@ -1210,6 +1210,10 @@
         }
 
         // Init
+        const adminSession = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+        if (!adminSession.token || adminSession.role !== 'admin') {
+            window.location.href = 'DirectLogin.html';
+        }
         loadStats();
         // Periodically refresh stats
         setInterval(loadStats, 30000);
