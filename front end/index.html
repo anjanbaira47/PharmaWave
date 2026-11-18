@@ -39,8 +39,9 @@
         <div class="navigation">
             <ul>
                 <li><a href="#catalog">Medicines</a></li>
-                <li><a href="#">Locations</a></li>
-                <li><a href="javascript:void(0)" onclick="toggleAIChat()">24/7 Support</a></li>
+                <li><a href="#catalog" onclick="showWishlistModal(); return false;">Wishlist</a></li>
+                <li><a href="#locations" onclick="openPharmacyLocations(event)">Locations</a></li>
+                <li><a href="javascript:void(0)" onclick="toggleAIChat()">Product Finder</a></li>
                 <li><a href="DirectLogin.html" class="nav-btn login" id="authBtn">Login</a></li>
             </ul>
         </div>
@@ -79,7 +80,7 @@
                 style="background: var(--surface); border: 1px solid var(--border-dark); color: var(--primary); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;"
                 onmouseover="this.style.background='rgba(16,185,129,0.1)'; this.style.borderColor='var(--primary)'"
                 onmouseout="this.style.background='var(--surface)'; this.style.borderColor='var(--border-dark)'"
-                title="Search by uploading a prescription or medicine image">
+                title="Upload an image prescription for review">
                 <ion-icon name="camera" style="font-size: 20px;"></ion-icon>
             </button>
         </div>
@@ -141,12 +142,12 @@
         <div
             style="margin:20px 0; padding:15px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <strong style="color:#0369a1; display:flex; align-items:center; gap:5px;"><ion-icon
-                        name="repeat-outline"></ion-icon> Auto-Refill Monthly</strong>
-                <div style="font-size:12px; color:#0284c7;">Get 10% off & free delivery on subscriptions</div>
+                <strong style="color:#64748b; display:flex; align-items:center; gap:5px;"><ion-icon
+                        name="repeat-outline"></ion-icon> Auto-Refill unavailable</strong>
+                <div style="font-size:12px; color:#64748b;">Subscriptions are disabled until billing and renewal rules are configured.</div>
             </div>
             <label style="position:relative; display:inline-block; width:50px; height:24px;">
-                <input type="checkbox" id="subscribeToggle" style="opacity:0; width:0; height:0;">
+                <input type="checkbox" id="subscribeToggle" disabled aria-label="Auto-refill subscriptions are unavailable" style="opacity:0; width:0; height:0;">
                 <span
                     style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#cbd5e1; transition:.4s; border-radius:24px;"></span>
                 <span class="toggle-slider"
@@ -226,23 +227,36 @@
     </div>
 
 
+    <div id="locationsModal" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(15,23,42,0.6); align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) closePharmacyLocations()">
+        <div style="width:min(600px,100%); max-height:80vh; overflow:auto; background:white; border-radius:20px; padding:24px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+                <div>
+                    <h2 style="margin:0;">Partner Pharmacy Locations</h2>
+                    <p style="color:#64748b; margin:6px 0 0;">Registered active pharmacies. Distance-based search is not available.</p>
+                </div>
+                <button onclick="closePharmacyLocations()" aria-label="Close locations" style="border:0; background:none; font-size:24px; cursor:pointer;">&times;</button>
+            </div>
+            <div id="pharmacyLocationsList" style="margin-top:20px;">Loading pharmacy locations...</div>
+        </div>
+    </div>
+
     <div id="aiChatWindow"
         style="display:none; position:fixed; bottom:100px; right:30px; width:350px; background:white; border-radius:20px; box-shadow:0 15px 35px rgba(0,0,0,0.15); z-index:100; flex-direction:column; overflow:hidden; border:1px solid #e2e8f0;">
         <div
             style="background:linear-gradient(135deg, #8b5cf6, #3b82f6); padding:20px; color:white; display:flex; justify-content:space-between; align-items:center;">
             <div style="font-weight:800; display:flex; align-items:center; gap:10px;"><ion-icon
-                    name="planet"></ion-icon> AI Pharmacist</div>
+                    name="search"></ion-icon> Product Finder</div>
             <ion-icon name="close" style="cursor:pointer; font-size:24px;" onclick="toggleAIChat()"></ion-icon>
         </div>
         <div id="aiChatMessages"
             style="height:300px; padding:20px; overflow-y:auto; background:#f8fafc; display:flex; flex-direction:column; gap:15px;">
             <div
                 style="background:white; padding:12px 16px; border-radius:15px 15px 15px 0; border:1px solid #e2e8f0; align-self:flex-start; font-size:14px; color:#334155;">
-                Hello! I am PharmaWave's AI Assistant. Tell me your symptoms, and I'll recommend the right medicines.
+                Hello! Search the catalog by product name or category. I can't diagnose symptoms or recommend treatment. For medical advice, contact a qualified healthcare professional.
             </div>
         </div>
         <div style="padding:15px; background:white; border-top:1px solid #e2e8f0; display:flex; gap:10px;">
-            <input type="text" id="aiChatInput" placeholder="E.g., I have a bad headache"
+            <input type="text" id="aiChatInput" placeholder="Search a product or category"
                 style="flex:1; padding:10px 15px; border-radius:50px; border:1px solid #cbd5e1; outline:none;"
                 onkeypress="if(event.key==='Enter') sendAIMessage()">
             <button onclick="sendAIMessage()"
@@ -278,9 +292,26 @@
 
     <script>
         // Store State
+        function readStoredArray(key) {
+            try {
+                const value = JSON.parse(localStorage.getItem(key) || '[]');
+                return Array.isArray(value) ? value : [];
+            } catch (error) {
+                console.error(`Stored ${key} data is invalid:`, error);
+                localStorage.removeItem(key);
+                return [];
+            }
+        }
+
         let products = [];
-        let cart = JSON.parse(localStorage.getItem('pharmaCart')) || [];
-        let wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+        let cart = readStoredArray('pharmaCart')
+            .filter(item => item && Number.isSafeInteger(Number(item.id)) &&
+                Number.isFinite(Number(item.price)) && Number.isSafeInteger(Number(item.quantity)) &&
+                Number(item.quantity) > 0)
+            .map(item => ({ ...item, id: Number(item.id), price: Number(item.price), quantity: Number(item.quantity) }));
+        let wishlist = readStoredArray('wishlist')
+            .map(Number)
+            .filter(id => Number.isSafeInteger(id) && id > 0);
         let currentUser = null;
 
         // Elements
@@ -296,6 +327,24 @@
         const toast = document.getElementById("toast");
         const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
+
+        function getProductImageUrl(value) {
+            const imageUrl = String(value || '').trim();
+            if (!imageUrl) return '';
+            if (imageUrl.startsWith('/uploads/')) return `${API_BASE}${imageUrl}`;
+            try {
+                const url = new URL(imageUrl, window.location.origin);
+                return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+            } catch {
+                return '';
+            }
+        }
+
         function showToast(message, type = "success") {
             toast.textContent = message;
             toast.className = "show " + type;
@@ -306,17 +355,35 @@
         async function checkLoginSession() {
             const storedUser = localStorage.getItem('pharmaUser');
             if (storedUser) {
-                currentUser = JSON.parse(storedUser);
-
-                // IMMEDIATE FIX: If this is an old Google login (userId is a string instead of number), purge it!
-                if (currentUser && typeof currentUser.userId === 'string' && currentUser.userId.length > 20) {
-                    console.error("Legacy Google session detected in index. Purging...");
+                try {
+                    currentUser = JSON.parse(storedUser);
+                } catch (error) {
+                    console.error("Stored login session is invalid:", error);
                     localStorage.removeItem('pharmaUser');
-                    window.location.reload(); // Refresh to clear UI
+                    currentUser = null;
                     return;
                 }
 
-                authBtn.innerHTML = `<img src="${currentUser.profile_pic || 'https://via.placeholder.com/150'}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:2px solid var(--primary);"> Profile`;
+                if (!currentUser || typeof currentUser !== 'object' ||
+                    !Number.isSafeInteger(Number(currentUser.userId)) ||
+                    Number(currentUser.userId) <= 0 ||
+                    typeof currentUser.token !== 'string' || !currentUser.token) {
+                    localStorage.removeItem('pharmaUser');
+                    currentUser = null;
+                    return;
+                }
+
+                currentUser.userId = Number(currentUser.userId);
+                authBtn.textContent = '';
+                const avatarUrl = getProductImageUrl(currentUser.profile_pic);
+                if (avatarUrl) {
+                    const avatar = document.createElement('img');
+                    avatar.src = avatarUrl;
+                    avatar.alt = '';
+                    avatar.style.cssText = 'width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);';
+                    authBtn.appendChild(avatar);
+                }
+                authBtn.appendChild(document.createTextNode(' Profile'));
                 authBtn.href = "Profile.html";
                 authBtn.classList.remove('login');
                 authBtn.style.background = 'rgba(255,255,255,0.8)';
@@ -404,7 +471,7 @@
             }
         }
 
-        async function fetchCheckoutPrescriptions() {
+        async function fetchCheckoutPrescriptions(selectedId = null) {
             if (!currentUser) return;
             try {
                 const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/prescriptions`, {
@@ -420,6 +487,7 @@
                     option.textContent = `Prescription #${prescription.id} (${prescription.status || 'Pending Review'})`;
                     select.appendChild(option);
                 });
+                if (selectedId !== null) select.value = String(selectedId);
             } catch (error) {
                 console.error('Failed to load prescriptions', error);
             }
@@ -458,35 +526,41 @@
             }
 
             productsToRender.forEach((product, index) => {
-                const rxBadge = product.category === 'Antibiotics' || product.category === 'Pain Relief' || product.category === 'Steroids'
+                const rxBadge = product.prescription_required === true || Number(product.prescription_required) === 1
                     ? `<span style="position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 800;">Rx REQUIRED</span>`
                     : '';
                     
-                const isWished = wishlist.includes(product.id);
+                const productId = Number(product.id);
+                if (!Number.isSafeInteger(productId) || productId <= 0) return;
+                const isWished = wishlist.includes(productId);
                 const heartColor = isWished ? '#ef4444' : '#cbd5e1';
                 
-                // Handle local uploaded images vs external URLs
-                const finalImageUrl = product.image_url && product.image_url.startsWith('/uploads') ? `${API_BASE}${product.image_url}` : product.image_url;
+                const finalImageUrl = getProductImageUrl(product.image_url);
+                const stock = Number(product.stock);
+                const outOfStock = Number.isFinite(stock) && stock <= 0;
+                const imageHtml = finalImageUrl
+                    ? `<img src="${escapeHtml(finalImageUrl)}" alt="${escapeHtml(product.name)}" class="product-image" onerror="this.remove()">`
+                    : `<ion-icon name="medkit" aria-hidden="true" style="font-size:60px;color:#cbd5e1;"></ion-icon>`;
 
                 const card = document.createElement('div');
                 card.className = 'product-card animate-stagger';
                 card.style.animationDelay = `${index * 0.1}s`;
                 card.innerHTML = `
-                    <div style="position: absolute; top: 10px; left: 10px; z-index: 10; cursor: pointer; transition: transform 0.2s;" onclick="toggleWishlist(${product.id}, this)">
+                    <div style="position: absolute; top: 10px; left: 10px; z-index: 10; cursor: pointer; transition: transform 0.2s;" onclick="toggleWishlist(${productId}, this)">
                         <ion-icon name="heart" style="font-size: 24px; color: ${heartColor}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));"></ion-icon>
                     </div>
                     <div style="position: relative; height: 180px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-bottom: 1px solid var(--border-light);">
-                        <img src="${finalImageUrl}" alt="${product.name}" class="product-image" onerror="this.src=''; this.parentElement.innerHTML='<ion-icon name=\\'medkit\\' style=\\'font-size: 60px; color: #cbd5e1;\\'></ion-icon>'">
+                        ${imageHtml}
                         ${rxBadge}
                     </div>
-                    <div class="product-category">${product.category}</div>
-                    <div class="product-name">${product.name}</div>
-                    <div class="product-desc" id="desc-${product.id}" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">${product.description}</div>
-                    <a href="javascript:void(0)" onclick="toggleDetails(${product.id})" id="btn-${product.id}" style="color: var(--primary); font-size: 12px; font-weight: 800; text-decoration: none; margin-bottom: 10px; display: inline-block;">View Details</a>
+                    <div class="product-category">${escapeHtml(product.category || 'General')}</div>
+                    <div class="product-name">${escapeHtml(product.name || 'Product')}</div>
+                    <div class="product-desc" id="desc-${productId}" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">${escapeHtml(product.description || '')}</div>
+                    <a href="#catalog" onclick="toggleDetails(${productId}); return false;" id="btn-${productId}" style="color: var(--primary); font-size: 12px; font-weight: 800; text-decoration: none; margin-bottom: 10px; display: inline-block;">View Details</a>
                     <div class="product-footer">
                         <div class="product-price">₹${Number(product.price).toFixed(2)}</div>
-                        <button class="add-btn" onclick="addToCart(${product.id})">
-                            <ion-icon name="add"></ion-icon>
+                        <button class="add-btn" onclick="addToCart(${productId})" ${outOfStock ? 'disabled' : ''} aria-label="${outOfStock ? 'Out of stock' : `Add ${escapeHtml(product.name)} to cart`}">
+                            ${outOfStock ? 'Out of stock' : '<ion-icon name="add"></ion-icon>'}
                         </button>
                     </div>
                 `;
@@ -550,28 +624,71 @@
         // Text Search Event
         searchInput.addEventListener('input', applyFilters);
 
-        // Upload Prescription Button (previously Image Search)
-        imageSearchInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                if (!currentUser) {
-                    showToast("Please login to upload prescriptions.", "error");
-                    setTimeout(() => window.location.href = "DirectLogin.html", 1500);
-                    return;
-                }
+        imageSearchInput.addEventListener('change', async event => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (!currentUser) {
+                showToast("Sign in before uploading a prescription.", "error");
+                event.target.value = '';
+                return;
+            }
+            if (!file.type.startsWith('image/')) {
+                showToast("Select an image prescription.", "error");
+                event.target.value = '';
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showToast("Prescription images must be under 5 MB.", "error");
+                event.target.value = '';
+                return;
+            }
 
-                showToast("Redirecting to secure Prescription Upload...", "success");
-                // Reset input
-                e.target.value = '';
-                setTimeout(() => window.location.href = "Profile.html", 1000);
+            try {
+                const imageData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onerror = () => reject(reader.error || new Error("Could not read the selected image."));
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsDataURL(file);
+                });
+                showToast("Uploading prescription for review...", "info");
+                const response = await fetch(`${API_BASE}/api/user/${currentUser.userId}/prescriptions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        imageData,
+                        fileName: file.name,
+                        mimeType: file.type,
+                        fileSize: file.size
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || "Prescription upload failed.");
+                }
+                showToast(data.message || "Prescription uploaded for review.", "success");
+                await fetchCheckoutPrescriptions(data.prescriptionId);
+            } catch (error) {
+                console.error("Prescription upload failed:", error);
+                showToast(error.message || "Prescription upload failed.", "error");
+            } finally {
+                event.target.value = '';
             }
         });
 
         // Cart Logic
         function addToCart(productId) {
-            const product = products.find(p => p.id === productId);
+            const product = products.find(p => Number(p.id) === Number(productId));
             if (!product) return;
 
-            const existingItem = cart.find(item => item.id === productId);
+            const stock = Number(product.stock);
+            const existingItem = cart.find(item => Number(item.id) === Number(productId));
+            if (Number.isFinite(stock) && (!existingItem ? stock < 1 : existingItem.quantity >= stock)) {
+                showToast("This product is out of stock.", "error");
+                return;
+            }
             if (existingItem) {
                 existingItem.quantity += 1;
             } else {
@@ -597,8 +714,14 @@
         }
 
         function changeCartQuantity(productId, delta) {
-            const item = cart.find(i => i.id === productId);
+            const item = cart.find(i => Number(i.id) === Number(productId));
             if (!item) return;
+            const product = products.find(p => Number(p.id) === Number(productId));
+            if (delta > 0 && product && Number.isFinite(Number(product.stock)) &&
+                item.quantity >= Number(product.stock)) {
+                showToast("You have reached the available stock quantity.", "error");
+                return;
+            }
             item.quantity += delta;
             if (item.quantity <= 0) {
                 removeFromCart(productId);
@@ -608,7 +731,7 @@
         }
 
         function moveToWishlist(productId) {
-            const item = cart.find(i => i.id === productId);
+            const item = cart.find(i => Number(i.id) === Number(productId));
             if (!item) return;
             if (!wishlist.includes(productId)) {
                 wishlist.push(productId);
@@ -652,7 +775,7 @@
                 itemEl.className = 'cart-item';
                 itemEl.innerHTML = `
                     <div style="flex-grow: 1; margin-right: 15px;">
-                        <div style="font-weight: 800; margin-bottom: 6px; font-size: 16px;">${item.name}</div>
+                        <div style="font-weight: 800; margin-bottom: 6px; font-size: 16px;">${escapeHtml(item.name)}</div>
                         <div style="color: var(--primary); font-size: 14px; font-weight: 600;">₹${Number(item.price).toFixed(2)} x ${item.quantity}</div>
                         <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
                             <button onclick="changeCartQuantity(${item.id}, -1)" style="background:#e2e8f0; border:none; border-radius:8px; width:32px; height:32px; cursor:pointer; font-weight:800;">-</button>
@@ -694,8 +817,6 @@
             const schedule = document.getElementById('checkoutSchedule').value;
             const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
             const prescriptionId = document.getElementById('checkoutPrescription').value || null;
-            const isSubscribed = document.getElementById('subscribeToggle').checked;
-
             checkoutBtn.textContent = 'Processing...';
             checkoutBtn.disabled = true;
 
@@ -723,22 +844,6 @@
                 const data = await response.json();
 
                 if (data.success) {
-
-                    // COD order is complete after the server transaction commits.
-                    if (isSubscribed) {
-                        try {
-                            await fetch(`${API_BASE}/api/subscriptions`, {
-                                method: 'POST', headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${currentUser.token || ''}`
-                                },
-                                body: JSON.stringify({ userId: currentUser.userId, cartItems: cart })
-                            });
-                            showToast("Monthly Subscription Activated!", "success");
-                        } catch (e) {
-                            showToast("Subscription activation failed.", "error");
-                        }
-                    }
 
                     showToast(`✅ Order placed! ID: #${data.orderId}`, "success");
                     cart = [];
@@ -769,14 +874,15 @@
         // PRO FEATURES (Phase 5)
         // ==========================================
         function toggleWishlist(productId, iconDiv) {
-            const index = wishlist.indexOf(productId);
+            const normalizedId = Number(productId);
+            const index = wishlist.indexOf(normalizedId);
             const icon = iconDiv.querySelector('ion-icon');
             if (index > -1) {
                 wishlist.splice(index, 1);
                 icon.style.color = '#cbd5e1';
                 showToast('Removed from Wishlist', 'success');
             } else {
-                wishlist.push(productId);
+                wishlist.push(normalizedId);
                 icon.style.color = '#ef4444';
                 iconDiv.style.transform = 'scale(1.3)';
                 setTimeout(() => iconDiv.style.transform = 'scale(1)', 200);
@@ -789,9 +895,11 @@
                 showToast("Your Wishlist is empty!", "error");
                 return;
             }
-            // Filter products and show only wishlist items
             currentCategory = 'All';
-            const wishedProducts = products.filter(p => wishlist.includes(p.id));
+            searchInput.value = '';
+            document.querySelectorAll('.category-btn').forEach(button => button.classList.remove('active'));
+            document.querySelector('.category-btn')?.classList.add('active');
+            const wishedProducts = products.filter(p => wishlist.includes(Number(p.id)));
             renderProducts(wishedProducts);
             document.getElementById('catalog').scrollIntoView({ behavior: 'smooth' });
             showToast(`Displaying ${wishedProducts.length} saved items`, "success");
@@ -802,62 +910,124 @@
             chat.style.display = chat.style.display === 'none' ? 'flex' : 'none';
         }
 
+        function appendAIMessage(text, isUser = false) {
+            const bubble = document.createElement('div');
+            bubble.style.cssText = isUser
+                ? 'background:#3b82f6;color:white;padding:12px 16px;border-radius:15px 15px 0 15px;align-self:flex-end;font-size:14px;max-width:90%;white-space:pre-wrap;'
+                : 'background:white;padding:12px 16px;border-radius:15px 15px 15px 0;border:1px solid #d8b4fe;align-self:flex-start;font-size:14px;color:#334155;border-left:4px solid #8b5cf6;max-width:95%;white-space:pre-wrap;';
+            bubble.textContent = text;
+            const chatBox = document.getElementById('aiChatMessages');
+            chatBox.appendChild(bubble);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return bubble;
+        }
+
         async function sendAIMessage() {
             const input = document.getElementById('aiChatInput');
             const msg = input.value.trim();
             if (!msg) return;
-
-            const chatBox = document.getElementById('aiChatMessages');
-
-            // User message bubble
-            chatBox.innerHTML += `
-                <div style="background:#3b82f6; color:white; padding:12px 16px; border-radius:15px 15px 0 15px; align-self:flex-end; font-size:14px;">
-                    ${msg}
-                </div>`;
+            if (msg.length > 100) {
+                showToast("Search text must be 100 characters or fewer.", "error");
+                return;
+            }
+            appendAIMessage(msg, true);
             input.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
                 const res = await fetch(`${API_BASE}/api/ai/recommend`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symptom: msg })
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: msg })
                 });
                 const data = await res.json();
-
-                let productHtml = '';
-                if (data.products && data.products.length > 0) {
-                    productHtml = `<div style="margin-top:10px; display:flex; flex-direction:column; gap:5px;">`;
-                    data.products.forEach(p => {
-                        productHtml += `<div style="background:white; border:1px solid #e2e8f0; padding:8px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-weight:700;">${p.name} <span style="font-size:10px;color:#f59e0b;">₹${p.price}</span></span>
-                            <button onclick="addToCart(${p.id}); showToast('Added ${p.name}', 'success')" style="background:#10b981; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">+ Add</button>
-                        </div>`;
-                    });
-                    productHtml += `</div>`;
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || "Product search failed.");
                 }
 
-                // AI Response bubble
-                chatBox.innerHTML += `
-                    <div style="background:white; padding:12px 16px; border-radius:15px 15px 15px 0; border:1px solid #d8b4fe; align-self:flex-start; font-size:14px; color:#334155; border-left:4px solid #8b5cf6;">
-                        ${data.message}
-                        ${productHtml}
-                    </div>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
-
-            } catch (e) {
-                chatBox.innerHTML += `<div style="background:#fee2e2; color:#991b1b; padding:12px; border-radius:15px; align-self:center; font-size:12px;">Connection error to AI brain.</div>`;
+                const responseBubble = appendAIMessage(data.message || "No catalog results found.");
+                (Array.isArray(data.products) ? data.products : []).forEach(product => {
+                    const productId = Number(product.id);
+                    if (!Number.isSafeInteger(productId) || productId <= 0) return;
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;';
+                    const detail = document.createElement('div');
+                    const name = document.createElement('strong');
+                    name.textContent = product.name || 'Product';
+                    const category = document.createElement('div');
+                    category.textContent = `${product.category || 'General'} · ₹${Number(product.price).toFixed(2)}`;
+                    category.style.cssText = 'font-size:12px;color:#64748b;margin-top:4px;';
+                    detail.append(name, category);
+                    const addButton = document.createElement('button');
+                    addButton.type = 'button';
+                    addButton.textContent = Number(product.stock) <= 0 ? 'Out of stock' : 'Add';
+                    addButton.disabled = Number(product.stock) <= 0;
+                    addButton.style.cssText = 'background:#10b981;color:white;border:0;padding:6px 10px;border-radius:4px;cursor:pointer;';
+                    addButton.addEventListener('click', () => addToCart(productId));
+                    row.append(detail, addButton);
+                    responseBubble.appendChild(row);
+                });
+            } catch (error) {
+                console.error("Product finder failed:", error);
+                appendAIMessage(error.message || "Product search is unavailable right now.");
             }
         }
 
 
-        function findNearbyPharmacies() {
-            if ("geolocation" in navigator) {
-                showToast("Scanning your location...", "success");
-                setTimeout(() => {
-                    showToast("Found 3 Partner Pharmacies within 2km! Loading catalog...", "success");
-                    // In a real app, this would filter the catalog or redirect
-                }, 2000);
-            } else {
-                showToast("Geolocation is not supported by your browser", "error");
+        function closePharmacyLocations() {
+            document.getElementById('locationsModal').style.display = 'none';
+        }
+
+        async function openPharmacyLocations(event) {
+            if (event) event.preventDefault();
+            const modal = document.getElementById('locationsModal');
+            const list = document.getElementById('pharmacyLocationsList');
+            modal.style.display = 'flex';
+            list.textContent = 'Loading pharmacy locations...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/pharmacies`);
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || "Could not load pharmacy locations.");
+                }
+
+                list.replaceChildren();
+                if (!Array.isArray(data.pharmacies) || data.pharmacies.length === 0) {
+                    list.textContent = 'No active partner pharmacy locations are available.';
+                    return;
+                }
+
+                data.pharmacies.forEach(pharmacy => {
+                    const card = document.createElement('article');
+                    card.style.cssText = 'padding:16px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:12px;';
+                    const name = document.createElement('h3');
+                    name.textContent = pharmacy.name || 'Partner pharmacy';
+                    name.style.margin = '0 0 8px';
+                    const location = document.createElement('p');
+                    location.textContent = pharmacy.location || 'Location details unavailable.';
+                    location.style.cssText = 'margin:0 0 8px;color:#475569;';
+                    card.append(name, location);
+
+                    if (pharmacy.contact) {
+                        const contact = document.createElement('p');
+                        contact.style.margin = '0';
+                        const phone = String(pharmacy.contact);
+                        const telephone = phone.replace(/[^\d+]/g, '');
+                        if (/^\+?\d{5,15}$/.test(telephone)) {
+                            const link = document.createElement('a');
+                            link.href = `tel:${telephone}`;
+                            link.textContent = phone;
+                            contact.appendChild(link);
+                        } else {
+                            contact.textContent = phone;
+                        }
+                        card.appendChild(contact);
+                    }
+                    list.appendChild(card);
+                });
+            } catch (error) {
+                console.error("Pharmacy location lookup failed:", error);
+                list.textContent = error.message || "Pharmacy locations are unavailable right now.";
             }
         }
 
@@ -866,6 +1036,12 @@
         async function useLiveLocation() {
             if (!currentUser) {
                 showToast("Please login to use live location.", "error");
+                return;
+            }
+
+            const mobile = String(currentUser.contact || '').replace(/\D/g, '').slice(-10);
+            if (!/^[6-9]\d{9}$/.test(mobile)) {
+                showToast("Add a valid mobile number to your profile before saving a live address.", "error");
                 return;
             }
 
@@ -902,7 +1078,7 @@
                             },
                             body: JSON.stringify({
                                 full_name: currentUser.full_name || currentUser.username || 'Customer',
-                                mobile: currentUser.contact || '0000000000',
+                                mobile,
                                 label: "Current Location (Live)",
                                 full_address: fullAddr,
                                 latitude,

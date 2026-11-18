@@ -704,7 +704,7 @@
 
         // LOADERS
         function getAuthHeaders() {
-            const user = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+            const user = adminSession || {};
             return {
                 'Authorization': `Bearer ${user.token || ''}`,
                 'Content-Type': 'application/json'
@@ -1021,7 +1021,7 @@
                         const statusBadge = o.status === 'Delivered' ? 'badge-success' : (o.status === 'Cancelled' ? 'badge-danger' : 'badge-warning');
                         const agentText = o.agent_name || '<span style="color:#94a3b8; font-style:italic;">Not Assigned</span>';
                         const cancelBtn = (o.status !== 'Delivered' && o.status !== 'Cancelled') ? `<button class="action-btn" onclick="cancelOrder(${o.id})" title="Cancel Order" style="color:#ef4444;"><ion-icon name="close-circle-outline"></ion-icon></button>` : '';
-                        const assignBtn = (!o.agent_id && o.status !== 'Cancelled' && o.status !== 'Delivered') ? `<button class="action-btn" onclick="openAssignModal(${o.id})" title="Assign Agent" style="color:#10b981;"><ion-icon name="person-add-outline"></ion-icon></button>` : '';
+                        const assignBtn = (!o.agent_id && o.status === 'Ready for Delivery') ? `<button class="action-btn" onclick="openAssignModal(${o.id})" title="Assign Agent" style="color:#10b981;"><ion-icon name="person-add-outline"></ion-icon></button>` : '';
 
                         tbody.innerHTML += `
                             <tr>
@@ -1210,13 +1210,20 @@
         }
 
         // Init
-        const adminSession = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
-        if (!adminSession.token || adminSession.role !== 'admin') {
-            window.location.href = 'DirectLogin.html';
+        let adminSession;
+        try {
+            adminSession = JSON.parse(localStorage.getItem('pharmaUser') || 'null');
+        } catch (error) {
+            console.error("Stored admin session is invalid:", error);
         }
-        loadStats();
-        // Periodically refresh stats
-        setInterval(loadStats, 30000);
+        if (!adminSession || typeof adminSession !== 'object' ||
+            !adminSession.token || adminSession.role !== 'admin') {
+            localStorage.removeItem('pharmaUser');
+            window.location.replace('DirectLogin.html');
+        } else {
+            loadStats();
+            setInterval(loadStats, 30000);
+        }
     </script>
     <script src="chatWidget.js"></script>
     <script>

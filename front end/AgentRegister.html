@@ -207,10 +207,10 @@
             submitBtn.disabled = true;
 
             try {
-                const res = await fetch(`${API_BASE}/api/auth/google`, {
+                const res = await fetch(`${API_BASE}/api/agent/register/google`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ token: response.credential, role: 'delivery' })
+                    body: JSON.stringify({ credential: response.credential })
                 });
 
                 const data = await res.json();
@@ -277,7 +277,9 @@
 
                     if (res.ok && data.success) {
                         localStorage.setItem('pharmaUser', JSON.stringify({
+                            userId: data.userId,
                             username: username,
+                            profile_pic: data.profile_pic,
                             role: 'delivery',
                             token: data.token
                         }));

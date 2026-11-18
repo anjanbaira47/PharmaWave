@@ -273,7 +273,7 @@
 
         loginBtn.addEventListener("click", async () => {
             const username = usernameInput.value.trim();
-            const password = passwordInput.value.trim();
+            const password = passwordInput.value;
 
             if (!username || !password) {
                 showToast("Credentials required", "error");

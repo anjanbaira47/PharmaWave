@@ -63,7 +63,13 @@
                         token: authData.token
                     }));
                     showToast("Google Login Successful!", "success");
-                    setTimeout(() => { window.location.href = "index.html"; }, 1500);
+                    setTimeout(() => {
+                        let destination = "index.html";
+                        if (authData.role === 'admin') destination = "AdminDashboard.html";
+                        else if (authData.role === 'delivery') destination = "DeliveryDashboard.html";
+                        else if (authData.role === 'pharmacy') destination = "PharmacyDashboard.html";
+                        window.location.href = destination;
+                    }, 1500);
                 } else {
                     showToast(authData.message || "Login failed", "error");
                 }
@@ -194,7 +200,7 @@
 
         loginBtn.addEventListener("click", async () => {
             const email = emailInput.value.trim();
-            const password = passwordInput.value.trim();
+            const password = passwordInput.value;
 
             if (!email || !password) {
                 showToast("Please enter both email and password", "error");

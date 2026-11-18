@@ -104,14 +104,12 @@ function injectChatWidget(role = 'user') {
 
     let socket;
     function initSocketConnection() {
-        if (!currentUser) return; // Must be logged in
+        if (!currentUser || typeof currentUser.token !== 'string' || !currentUser.token) return;
 
-        socket = io(API_BASE);
+        socket = io(API_BASE, { auth: { token: currentUser.token } });
 
         socket.on("connect", () => {
             console.log("Chat connected!");
-            // Join specific room
-            socket.emit("join", { userId: currentUser.userId || currentUser.id, role: currentUser.role });
         });
 
         socket.on("receiveMessage", (data) => {

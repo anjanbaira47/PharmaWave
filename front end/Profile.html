@@ -347,7 +347,7 @@
                     style="margin-top: 15px; font-weight:900; font-size:24px; color: var(--text-main);">User</h3>
                 <p
                     style="color: var(--primary-light); font-size: 13px; font-weight: 800; background: rgba(16, 185, 129, 0.1); padding: 6px 16px; border-radius: 50px; display: inline-block; margin-top: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
-                    PREMIUM MEMBER
+                    CUSTOMER ACCOUNT
                 </p>
             </div>
 
@@ -402,7 +402,7 @@
                         <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; width:100%; min-width:0;">
                             <p id="infoUsername"
                                 style="margin-top: 0; font-size: 22px; font-weight: 800; color: var(--text-main); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%;">
-                                Loading...</p>
+                                Not assigned</p>
                             <button id="editUsernameBtn" onclick="toggleUsernameEdit()"
                                 style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: background 0.2s; flex-shrink: 0;">
                                 <ion-icon name="pencil" style="font-size: 16px;"></ion-icon>
@@ -510,6 +510,10 @@
                                 <label for="newAddrLandmark" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Landmark</label>
                                 <input id="newAddrLandmark" type="text" maxlength="255" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box;" placeholder="Near school / hospital / market" />
                             </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label for="newAddrFullAddress" style="display:block; font-size:12px; font-weight:800; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;">Full Address (optional)</label>
+                                <textarea id="newAddrFullAddress" maxlength="2000" rows="3" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-dark); font-size:15px; box-sizing:border-box; resize:vertical;" placeholder="Use this for a landmark or map location not covered by the fields above."></textarea>
+                            </div>
                         </div>
                         <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text-main); cursor: pointer; width: fit-content;">
                             <input type="checkbox" id="newAddrDefault" name="is_default" style="width: 18px; height: 18px; accent-color: var(--primary);">
@@ -517,6 +521,7 @@
                         </label>
                         <div>
                             <button type="submit" id="saveAddrBtn" style="background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: fit-content; margin-top: 5px;">Save Address</button>
+                            <button type="button" id="cancelAddrEditBtn" onclick="resetAddressForm()" style="display:none; background: white; color: var(--text-main); border: 1px solid var(--border-dark); padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-top: 5px;">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -749,7 +754,7 @@
         // Init Data
         document.getElementById('sidebarName').textContent = currentUser.username;
         document.getElementById('infoUsername').textContent = currentUser.username;
-        document.getElementById('infoUserId').textContent = "#PW-" + (currentUser.userId ? currentUser.userId.toString().padStart(4, '0') : '0000');
+        document.getElementById('infoUserId').textContent = 'Not assigned';
 
         if (currentUser.profile_pic) {
             document.getElementById('mainAvatar').src = currentUser.profile_pic;
@@ -914,15 +919,72 @@
 
         // --- Tracking ---
         let trackMap = null;
+        let trackMapMarker = null;
+        let currentTrackingOrderId = null;
+        function showTrackingMap(latitude, longitude) {
+            const mapElement = document.getElementById('trackMap');
+            const hasCoordinates = latitude !== null && latitude !== undefined && latitude !== '' &&
+                longitude !== null && longitude !== undefined && longitude !== '';
+            const lat = hasCoordinates ? Number(latitude) : NaN;
+            const lng = hasCoordinates ? Number(longitude) : NaN;
+            if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+                if (!trackMap) {
+                    mapElement.innerHTML = `
+                        <div style="text-align: center; padding: 20px;">
+                            <ion-icon name="time-outline" style="font-size: 48px; color: #cbd5e1;"></ion-icon>
+                            <p style="color: #64748b; font-weight: 600;">Awaiting agent GPS signal...</p>
+                            <p style="font-size: 12px; color: #94a3b8;">Map will appear once the agent shares their location.</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            if (!window.L) {
+                const url = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+                mapElement.innerHTML = `<a href="${url}" target="_blank" rel="noopener noreferrer">Open the agent location in OpenStreetMap</a>`;
+                return;
+            }
+
+            if (!trackMap) {
+                mapElement.innerHTML = '';
+                trackMap = L.map(mapElement).setView([lat, lng], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(trackMap);
+            } else {
+                trackMap.setView([lat, lng], 15);
+            }
+            if (trackMapMarker) {
+                trackMapMarker.setLatLng([lat, lng]);
+            } else {
+                trackMapMarker = L.marker([lat, lng]).addTo(trackMap);
+            }
+            trackMapMarker.bindPopup('Delivery agent location').openPopup();
+        }
+
+        function trackingProgress(status) {
+            const normalizedStatus = String(status || '').toLowerCase();
+            if (normalizedStatus === 'delivered') return 100;
+            if (['ready for delivery', 'picked it up', 'out for delivery'].includes(normalizedStatus)) return 66;
+            return 33;
+        }
+
         async function trackOrder() {
             const input = document.getElementById('trackOrderIdInput');
             const id = input.value.trim();
             if (!id) return showToast("Enter an Order ID", "error");
+            if (String(currentTrackingOrderId) !== String(id) && trackMap) {
+                trackMap.remove();
+                trackMap = null;
+                trackMapMarker = null;
+            }
+            currentTrackingOrderId = id;
 
             try {
                 const res = await fetch(`${API_BASE}/api/orders/${id}/track`, { headers: getAuthHeaders() });
                 const data = await res.json();
-                if (data.success) {
+                if (res.ok && data.success) {
                     const t = data.tracking;
                     document.getElementById('trackResult').style.display = 'block';
                     document.getElementById('trackStatusText').textContent = t.status || 'Processing';
@@ -937,30 +999,9 @@
                     }
 
                     // Progress
-                    let progress = 33;
-                    if (t.status === 'Picked it Up' || t.status === 'Out for Delivery') progress = 66;
-                    if (t.status === 'Delivered') progress = 100;
-                    document.getElementById('trackProgressBar').style.width = progress + '%';
+                    document.getElementById('trackProgressBar').style.width = trackingProgress(t.status) + '%';
 
-                    // Initialize/Update Map
-                    if (t.lat && t.lng) {
-                        document.getElementById('trackMap').innerHTML = ''; // Clear placeholder
-                        if (!trackMap) {
-                            trackMap = L.map('trackMap').setView([t.lat, t.lng], 15);
-                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(trackMap);
-                        } else {
-                            trackMap.setView([t.lat, t.lng], 15);
-                        }
-                        L.marker([t.lat, t.lng]).addTo(trackMap).bindPopup('Delivery Agent Location').openPopup();
-                    } else {
-                        document.getElementById('trackMap').innerHTML = `
-                            <div style="text-align: center; padding: 20px;">
-                                <ion-icon name="time-outline" style="font-size: 48px; color: #cbd5e1;"></ion-icon>
-                                <p style="color: #64748b; font-weight: 600;">Awaiting agent GPS signal...</p>
-                                <p style="font-size: 12px; color: #94a3b8;">Map will appear once the agent is en route.</p>
-                            </div>
-                        `;
-                    }
+                    showTrackingMap(t.lat, t.lng);
 
                 } else {
                     showToast(data.message, "error");
@@ -1100,6 +1141,7 @@
                 }
 
                 const user = data.user;
+                document.getElementById('infoUserId').textContent = user.membership_id || 'Not assigned';
                 document.getElementById('profileFullName').value = user.full_name || '';
                 document.getElementById('profileEmail').value = user.email || '';
                 document.getElementById('profileMobile').value = user.contact || '';
@@ -1178,12 +1220,13 @@
                 container.innerHTML = '<p style="color: var(--text-muted); font-weight: 500;">Securely fetching your live orders...</p>';
                 const response = await fetch(`${API_BASE}/api/orders/user/${currentUser.userId}`, { headers: getAuthHeaders() });
                 const data = await response.json();
+                const stats = data.stats || {};
+                document.getElementById('infoTotalSpent').textContent = `₹${Number(stats.total_spent || 0).toFixed(2)}`;
+                document.getElementById('infoOrderCount').textContent = Number(stats.total_orders || 0);
 
                 if (data.success && data.orders.length > 0) {
                     container.innerHTML = '';
-                    let totalSpent = 0;
                     data.orders.forEach(o => {
-                        if (o.status !== 'Cancelled') totalSpent += Number(o.total_amount);
                         const date = new Date(o.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
                         const statusClass = (!o.status || o.status.includes('Preparing')) ? 'status-preparing' : 'status-delivered';
                         const statusText = o.status || 'Preparing Delivery';
@@ -1202,8 +1245,6 @@
                             </div>
                         `;
                     });
-                    document.getElementById('infoTotalSpent').textContent = `₹${totalSpent.toFixed(2)}`;
-                    document.getElementById('infoOrderCount').textContent = data.orders.length;
                 } else {
                     container.innerHTML = `
                         <div style="text-align:center; padding: 60px 0; background: rgba(255,255,255,0.5); border-radius: 20px;">
@@ -1247,6 +1288,19 @@
         }
 
         // --- Addresses Logic ---
+        let savedAddresses = [];
+        let editingAddressId = null;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[character]);
+        }
+
         async function fetchAddresses() {
             const container = document.getElementById('addressesContainer');
             try {
@@ -1254,29 +1308,32 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    if (data.addresses.length > 0) {
-                        container.innerHTML = '';
-                        data.addresses.forEach(addr => {
-                            const title = addr.title || addr.label || 'Home';
-                            const fullAddress = addr.full_address || addr.fullAddress || 'Address not available';
+                    savedAddresses = Array.isArray(data.addresses) ? data.addresses : [];
+                    if (savedAddresses.length > 0) {
+                        container.innerHTML = savedAddresses.map(addr => {
+                            const title = escapeHtml(addr.title || addr.label || 'Home');
+                            const fullAddress = escapeHtml(addr.full_address || addr.fullAddress || 'Address not available');
                             const defaultBadge = addr.is_default ? `<span style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; margin-left: 10px;">DEFAULT</span>` : '';
-                            container.innerHTML += `
+                            return `
                                 <div class="order-card" style="align-items: flex-start; margin-bottom: 15px; padding: 20px;">
                                     <div style="flex: 1;">
                                         <h4 style="margin: 0 0 8px 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center;">${title} ${defaultBadge}</h4>
                                         <p style="margin: 0; color: var(--text-muted); font-size: 15px; line-height: 1.5;">${fullAddress}</p>
                                     </div>
-                                    <button onclick="deleteAddress(${addr.id})" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                                    <button onclick="editAddress(${Number(addr.id)})" style="background: rgba(16, 185, 129, 0.1); color: var(--primary); border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s;" aria-label="Edit ${title} address">
+                                        <ion-icon name="create-outline" style="font-size: 18px;"></ion-icon>
+                                    </button>
+                                    <button onclick="deleteAddress(${Number(addr.id)})" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s;" aria-label="Delete ${title} address">
                                         <ion-icon name="trash" style="font-size: 18px;"></ion-icon>
                                     </button>
                                 </div>
                             `;
-                        });
+                        }).join('');
                     } else {
                         container.innerHTML = '<p style="color: var(--text-muted); font-weight: 500;">You haven\'t saved any delivery addresses yet.</p>';
                     }
                 } else {
-                    container.innerHTML = `<p style="color: #ef4444; font-weight: 600;">Failed to load: ${data.message || 'Unknown error'}</p>`;
+                    container.innerHTML = `<p style="color: #ef4444; font-weight: 600;">Failed to load: ${escapeHtml(data.message || 'Unknown error')}</p>`;
                     if (data.message === "Unauthorized") {
                         showToast("Session expired. Please Login again.", "error");
                     }
@@ -1284,6 +1341,38 @@
             } catch (e) {
                 container.innerHTML = '<p style="color: #ef4444; font-weight: 600;">System error fetching addresses.</p>';
             }
+        }
+
+        function editAddress(addressId) {
+            const address = savedAddresses.find(item => String(item.id) === String(addressId));
+            if (!address) {
+                showToast('Address could not be found. Refresh and try again.', 'error');
+                return;
+            }
+
+            editingAddressId = address.id;
+            document.getElementById('newAddrFullName').value = address.full_name || '';
+            document.getElementById('newAddrMobile').value = address.mobile || '';
+            document.getElementById('newAddrTitle').value = address.title || address.label || 'Home';
+            document.getElementById('newAddrHouse').value = address.house_number || '';
+            document.getElementById('newAddrStreet').value = address.street || '';
+            document.getElementById('newAddrCity').value = address.city || '';
+            document.getElementById('newAddrState').value = address.state || '';
+            document.getElementById('newAddrPincode').value = address.pincode || '';
+            document.getElementById('newAddrLandmark').value = address.landmark || '';
+            const hasStructuredAddress = Boolean(address.house_number || address.street || address.city || address.state || address.pincode);
+            document.getElementById('newAddrFullAddress').value = hasStructuredAddress ? '' : (address.full_address || '');
+            document.getElementById('newAddrDefault').checked = Boolean(address.is_default);
+            document.getElementById('saveAddrBtn').textContent = 'Update Address';
+            document.getElementById('cancelAddrEditBtn').style.display = 'inline-block';
+            document.getElementById('addAddressForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function resetAddressForm() {
+            editingAddressId = null;
+            document.getElementById('addAddressForm').reset();
+            document.getElementById('saveAddrBtn').textContent = 'Save Address';
+            document.getElementById('cancelAddrEditBtn').style.display = 'none';
         }
 
         async function saveNewAddress() {
@@ -1296,10 +1385,16 @@
             const state = document.getElementById('newAddrState').value.trim();
             const pincode = document.getElementById('newAddrPincode').value.trim();
             const landmark = document.getElementById('newAddrLandmark').value.trim();
+            const full_address = document.getElementById('newAddrFullAddress').value.trim();
             const is_default = document.getElementById('newAddrDefault').checked;
 
-            if (!full_name || !mobile || !house_number || !street || !city || !state || !pincode) {
-                showToast('Please fill all required address fields.', 'error');
+            const hasStructuredAddress = Boolean(house_number || street || city || state || pincode);
+            if (!full_name || !mobile || (!full_address && (!house_number || !street || !city || !state || !pincode))) {
+                showToast('Enter the recipient details and either a full address or all required address fields.', 'error');
+                return;
+            }
+            if (!/^[6-9]\d{9}$/.test(mobile)) {
+                showToast('Enter a valid 10-digit mobile number.', 'error');
                 return;
             }
 
@@ -1308,28 +1403,34 @@
             try {
                 if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
-                const res = await fetch(`${API_BASE}/api/user/${currentUser.userId}/addresses`, {
-                    method: 'POST',
+                const endpoint = editingAddressId
+                    ? `${API_BASE}/api/user/${currentUser.userId}/addresses/${editingAddressId}`
+                    : `${API_BASE}/api/user/${currentUser.userId}/addresses`;
+                const res = await fetch(endpoint, {
+                    method: editingAddressId ? 'PUT' : 'POST',
                     headers: getAuthHeaders(),
-                    body: JSON.stringify({ full_name, mobile, label, house_number, street, city, state, pincode, landmark, is_default })
+                    body: JSON.stringify({
+                        full_name,
+                        mobile,
+                        label,
+                        house_number,
+                        street,
+                        city,
+                        state,
+                        pincode,
+                        landmark,
+                        full_address: hasStructuredAddress ? '' : full_address,
+                        is_default
+                    })
                 });
                 const data = await res.json();
 
                 if (data.success) {
-                    showToast('Address saved successfully!', 'success');
-                    document.getElementById('newAddrFullName').value = '';
-                    document.getElementById('newAddrMobile').value = '';
-                    document.getElementById('newAddrTitle').value = '';
-                    document.getElementById('newAddrHouse').value = '';
-                    document.getElementById('newAddrStreet').value = '';
-                    document.getElementById('newAddrCity').value = '';
-                    document.getElementById('newAddrState').value = '';
-                    document.getElementById('newAddrPincode').value = '';
-                    document.getElementById('newAddrLandmark').value = '';
-                    document.getElementById('newAddrDefault').checked = false;
-                    fetchAddresses();
+                    showToast(editingAddressId ? 'Address updated successfully!' : 'Address saved successfully!', 'success');
+                    resetAddressForm();
+                    await fetchAddresses();
                 } else {
-                    showToast(data.message, 'error');
+                    showToast(data.message || 'Address could not be saved.', 'error');
                 }
             } catch (e) {
                 showToast('Connection error while saving address.', 'error');
@@ -1348,7 +1449,10 @@
                 const data = await res.json();
                 if (data.success) {
                     showToast("Address deleted.", "success");
-                    fetchAddresses();
+                    if (String(editingAddressId) === String(addressId)) resetAddressForm();
+                    await fetchAddresses();
+                } else {
+                    showToast(data.message || "Address could not be deleted.", "error");
                 }
             } catch (err) {
                 console.error("Delete address failed", err);
@@ -1511,10 +1615,17 @@
         }
 
         // Init Setup Sockets
-        window.socket = io(API_BASE);
+        window.socket = io(API_BASE, { auth: { token: currentUser.token } });
         
-        window.socket.on("order_update_" + currentUser.userId, (data) => {
-            showToast("Order Update: " + data.status, "success");
+        window.socket.on("order_update", (data) => {
+            if (data.status) showToast("Order Update: " + data.status, "success");
+            if (String(data.orderId) === String(currentTrackingOrderId)) {
+                if (data.status) {
+                    document.getElementById('trackStatusText').textContent = data.status;
+                    document.getElementById('trackProgressBar').style.width = trackingProgress(data.status) + '%';
+                }
+                if (data.lat !== undefined || data.lng !== undefined) showTrackingMap(data.lat, data.lng);
+            }
             
             if (document.getElementById('tab-order-history').classList.contains('active')) {
                 fetchOrders();
@@ -1523,6 +1634,9 @@
                 setTimeout(() => showRatingModal(data.orderId), 1500);
             }
         });
+
+        loadProfileDetails();
+        fetchOrders();
 
     </script>
     <script src="chatWidget.js"></script>

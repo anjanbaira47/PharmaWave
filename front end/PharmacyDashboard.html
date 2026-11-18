@@ -329,9 +329,17 @@
     </div>
 
     <script>
-        const pharmacySession = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
-        if (!pharmacySession.token || (pharmacySession.role !== 'pharmacy' && pharmacySession.role !== 'admin')) {
-            window.location.href = 'DirectLogin.html';
+        let pharmacySession;
+        try {
+            pharmacySession = JSON.parse(localStorage.getItem('pharmaUser') || 'null');
+        } catch (error) {
+            console.error("Stored pharmacy session is invalid:", error);
+        }
+        if (!pharmacySession || typeof pharmacySession !== 'object' ||
+            !pharmacySession.token || (pharmacySession.role !== 'pharmacy' && pharmacySession.role !== 'admin')) {
+            localStorage.removeItem('pharmaUser');
+            window.location.replace('DirectLogin.html');
+            pharmacySession = null;
         }
 
         const toast = document.getElementById("toast");
@@ -365,7 +373,7 @@
 
         // LOADERS
         function getAuthHeaders() {
-            const user = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+            const user = pharmacySession || {};
             return {
                 'Authorization': `Bearer ${user.token || ''}`,
                 'Content-Type': 'application/json'

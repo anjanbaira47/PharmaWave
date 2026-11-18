@@ -261,16 +261,16 @@
                 </div>
                 <!-- Availability Toggle -->
                 <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
-                    <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;" onchange="showToast(this.checked ? 'You are now Online' : 'You are now Offline', this.checked ? 'success' : 'error')">
-                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary); transition: .4s; border-radius: 34px;"></span>
-                    <span style="position: absolute; content: ''; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; transform: translateX(20px);"></span>
+                    <input id="availabilityToggle" type="checkbox" checked style="opacity: 0; width: 0; height: 0;" onchange="updateAvailability(this)">
+                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #64748b; transition: .4s; border-radius: 34px;"></span>
+                    <span style="position: absolute; content: ''; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%;"></span>
                 </label>
             </div>
 
             <div class="nav-item active" onclick="switchTab('pool', this)">
                 <ion-icon name="list-circle"></ion-icon> Order Pool
             </div>
-            <div class="nav-item" onclick="switchTab('deliveries', this)">
+            <div id="deliveriesNav" class="nav-item" onclick="switchTab('deliveries', this)">
                 <ion-icon name="map"></ion-icon> Active Deliveries
             </div>
             <div class="nav-item" onclick="switchTab('earnings', this)">
@@ -301,14 +301,11 @@
                         <h1 style="margin:0; font-size:32px; font-weight:900; color:#0f172a;">Order Pool</h1>
                         <p style="color:#64748b; font-weight:600; margin:5px 0 0 0;">Accept new delivery requests.</p>
                     </div>
-                    <div style="position: relative; cursor: pointer;">
-                        <ion-icon name="notifications" style="font-size: 28px; color: #64748b;"></ion-icon>
-                        <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; font-weight: 800;">3</span>
-                    </div>
+                    <ion-icon name="notifications" style="font-size: 28px; color: #64748b;"></ion-icon>
                 </div>
 
                 <div id="poolContainer">
-                    <p style="color:#64748b; font-weight:600;">Scanning for nearby requests...</p>
+                    <p style="color:#64748b; font-weight:600;">Checking orders ready for delivery...</p>
                 </div>
             </div>
 
@@ -317,19 +314,18 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 30px;">
                     <div>
                         <h1 style="margin:0; font-size:32px; font-weight:900; color:#0f172a;">Active Deliveries</h1>
-                        <p style="color:#64748b; font-weight:600; margin:5px 0 0 0;">Accept pickups and navigate to
-                            customers.</p>
+                        <p style="color:#64748b; font-weight:600; margin:5px 0 0 0;">Manage assigned orders and delivery progress.</p>
                     </div>
-                    <div
+                    <div id="deliveryStatusBadge"
                         style="background:#dcfce7; color:#166534; padding:8px 16px; border-radius:50px; font-weight:800; font-size:14px; display:flex; align-items:center; gap:5px;">
-                        <span
+                        <span id="deliveryStatusDot"
                             style="width:8px; height:8px; background:#166534; border-radius:50%; display:inline-block;"></span>
-                        Online
+                        <span id="deliveryStatusLabel">Loading availability...</span>
                     </div>
                 </div>
 
                 <div id="deliveriesContainer">
-                    <p style="color:#64748b; font-weight:600;">Searching for nearby requests...</p>
+                    <p style="color:#64748b; font-weight:600;">Loading assigned deliveries...</p>
                 </div>
             </div>
 
@@ -358,30 +354,7 @@
                     </div>
                 </div>
 
-                <div style="background: white; padding: 30px; border-radius: 20px; border: 1px solid #e2e8f0; text-align: center; margin-bottom: 30px;">
-                    <ion-icon name="star" style="font-size:48px; color:#f59e0b; margin-bottom:15px;"></ion-icon>
-                    <h2 style="margin:0 0 10px 0; color:#0f172a;">Great Job!</h2>
-                    <p style="color:#64748b; margin:0;">You are doing fantastic. Keep up the flawless delivery ratings!</p>
-                </div>
-
-                <h3 style="margin-bottom: 15px; color: #0f172a;">Recent Payments</h3>
-                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
-                    <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-weight: 700; color: #64748b; font-size: 14px;">
-                        <span>Date</span>
-                        <span>Amount</span>
-                        <span>Status</span>
-                    </div>
-                    <div style="padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;">Today</span>
-                        <span style="font-weight: 800;">₹450.00</span>
-                        <span style="color: #10b981; font-size: 12px; font-weight: 800; background: #dcfce7; padding: 4px 8px; border-radius: 6px;">Paid</span>
-                    </div>
-                    <div style="padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;">Yesterday</span>
-                        <span style="font-weight: 800;">₹850.00</span>
-                        <span style="color: #10b981; font-size: 12px; font-weight: 800; background: #dcfce7; padding: 4px 8px; border-radius: 6px;">Paid</span>
-                    </div>
-                </div>
+                <p id="earningsNotice" style="color:#64748b; margin-top:24px;">Payout rates and payment history have not been configured.</p>
             </div>
 
             <!-- PERFORMANCE TAB -->
@@ -391,25 +364,24 @@
                     <div class="stat-card">
                         <div class="stat-info">
                             <h3>Average Rating</h3>
-                            <div class="value">4.9 <ion-icon name="star" style="color: #f59e0b; font-size: 24px;"></ion-icon></div>
+                            <div class="value">Not available</div>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-info">
                             <h3>On-Time Delivery</h3>
-                            <div class="value">98%</div>
+                            <div class="value">Not available</div>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-info">
                             <h3>Customer Compliments</h3>
-                            <div class="value">45</div>
+                            <div class="value">Not available</div>
                         </div>
                     </div>
                 </div>
                 <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 30px; text-align: center;">
-                    <img src="https://via.placeholder.com/400x200?text=Monthly+Performance+Chart" style="width: 100%; max-width: 600px; border-radius: 10px;">
-                    <p style="color: #64748b; font-weight: 600; margin-top: 15px;">Your delivery times have improved by 12% this month.</p>
+                    <p style="color: #64748b; font-weight: 600;">Performance reporting is not configured yet.</p>
                 </div>
             </div>
 
@@ -452,15 +424,15 @@
             <div id="tab-support" class="tab-panel">
                 <h1 style="margin:0 0 30px 0; font-size:32px; font-weight:900; color:#0f172a;">Help & Support</h1>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer;" onclick="window.location.href='tel:+91123456789'">
+                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center;">
                         <ion-icon name="call" style="font-size: 40px; color: #3b82f6; margin-bottom: 15px;"></ion-icon>
-                        <h3 style="margin: 0 0 10px 0;">Call Dispatch</h3>
-                        <p style="color: #64748b; font-size: 14px;">Instant connection to the central team.</p>
+                        <h3 style="margin: 0 0 10px 0;">Dispatch contact unavailable</h3>
+                        <p style="color: #64748b; font-size: 14px;">Dispatch contact details have not been configured.</p>
                     </div>
-                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer;" onclick="showToast('Connecting to Support Chat...', 'success')">
+                    <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center;">
                         <ion-icon name="chatbubbles" style="font-size: 40px; color: #10b981; margin-bottom: 15px;"></ion-icon>
-                        <h3 style="margin: 0 0 10px 0;">Live Chat</h3>
-                        <p style="color: #64748b; font-size: 14px;">Chat with a support executive.</p>
+                        <h3 style="margin: 0 0 10px 0;">Support chat unavailable</h3>
+                        <p style="color: #64748b; font-size: 14px;">Support chat has not been configured.</p>
                     </div>
                     <div style="background: white; border-radius: 16px; padding: 30px; border: 1px solid #e2e8f0; text-align: center; cursor: pointer;" onclick="reportIssue()">
                         <ion-icon name="warning" style="font-size: 40px; color: #ef4444; margin-bottom: 15px;"></ion-icon>
@@ -488,11 +460,21 @@
     </div>
 
     <script>
-        const currentUser = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+        let currentUser = {};
+        try {
+            currentUser = JSON.parse(localStorage.getItem('pharmaUser') || '{}');
+            if (!currentUser || typeof currentUser !== 'object' || Array.isArray(currentUser)) currentUser = {};
+        } catch {
+            localStorage.removeItem('pharmaUser');
+        }
         const API_BASE = window.APP_CONFIG ? window.APP_CONFIG.API_BASE : (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
         
-        if (!currentUser.token || (currentUser.role !== 'delivery' && currentUser.role !== 'admin')) {
-             window.location.href = "DirectLogin.html";
+        const validDeliverySession = typeof currentUser.token === 'string' &&
+            currentUser.token.length > 0 && currentUser.role === 'delivery' &&
+            (typeof currentUser.userId === 'number' || typeof currentUser.userId === 'string');
+        if (!validDeliverySession) {
+            localStorage.removeItem('pharmaUser');
+            window.location.replace("DirectLogin.html");
         }
 
         const toast = document.getElementById("toast");
@@ -515,6 +497,11 @@
         }
 
         let currentDeliveryId = null;
+        const mapTargets = new Map();
+        const mapInstances = new Map();
+        const locationWatchIds = new Map();
+        const lastLocationSentAt = new Map();
+        let savedAvailability = 'Online';
 
         function showPodModal(orderId) {
             currentDeliveryId = orderId;
@@ -526,13 +513,21 @@
             document.getElementById('podModal').style.display = 'none';
         }
 
-        document.getElementById('podConfirmBtn').addEventListener('click', () => {
+        document.getElementById('podConfirmBtn').addEventListener('click', async () => {
             const deliveryId = currentDeliveryId;
             if (!deliveryId) return;
-            showToast("Proof verified! Order Delivered.", "success");
-            closePodModal();
-            updateStatus(deliveryId, 'Delivered');
+            const button = document.getElementById('podConfirmBtn');
+            button.disabled = true;
+            const updated = await updateStatus(deliveryId, 'Delivered');
+            button.disabled = false;
+            if (updated) closePodModal();
         });
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
 
         function getAuthHeaders() {
             return {
@@ -547,26 +542,43 @@
                 const data = await res.json();
                 if (data.success) {
                     const p = data.profile;
+                    const username = String(p.username || 'Delivery agent');
+                    savedAvailability = p.availability === 'Offline' ? 'Offline' : 'Online';
                     document.getElementById('agentName').value = p.username || '';
                     document.getElementById('agentPhone').value = p.phone || '';
                     document.getElementById('agentVehicle').value = p.vehicle_type || 'Motorcycle';
                     document.getElementById('agentPlate').value = p.vehicle_number || '';
+                    document.getElementById('availabilityToggle').checked = savedAvailability === 'Online';
+                    document.getElementById('availabilityToggle').nextElementSibling.style.backgroundColor =
+                        savedAvailability === 'Online' ? '#10b981' : '#64748b';
+                    document.getElementById('availabilityToggle').nextElementSibling.nextElementSibling.style.transform =
+                        savedAvailability === 'Online' ? 'translateX(20px)' : 'translateX(0)';
+                    document.getElementById('deliveryStatusLabel').textContent = savedAvailability;
+                    const statusColor = savedAvailability === 'Online' ? '#166534' : '#64748b';
+                    const statusBackground = savedAvailability === 'Online' ? '#dcfce7' : '#e2e8f0';
+                    document.getElementById('deliveryStatusBadge').style.color = statusColor;
+                    document.getElementById('deliveryStatusBadge').style.backgroundColor = statusBackground;
+                    document.getElementById('deliveryStatusDot').style.backgroundColor = statusColor;
                     
                     // Update Sidebar
-                    document.getElementById('sideAgentName').textContent = p.username;
+                    document.getElementById('sideAgentName').textContent = username;
                     document.getElementById('sideAgentId').textContent = `Agent #${currentUser.userId}`;
-                    const initials = p.username.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                    const initials = username.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
                     document.getElementById('agentInitials').textContent = initials || '??';
                 }
-            } catch (e) { console.error("Profile load error", e); }
+            } catch (e) {
+                console.error("Profile load failed:", e);
+                showToast("Could not load delivery profile.", "error");
+            }
         }
 
-        async function saveAgentProfile() {
+        async function saveAgentProfile(showSuccess = true) {
             const data = {
                 username: document.getElementById('agentName').value,
                 phone: document.getElementById('agentPhone').value,
                 vehicle_type: document.getElementById('agentVehicle').value,
-                vehicle_number: document.getElementById('agentPlate').value
+                vehicle_number: document.getElementById('agentPlate').value,
+                availability: document.getElementById('availabilityToggle').checked ? 'Online' : 'Offline'
             };
             
             try {
@@ -576,18 +588,32 @@
                     body: JSON.stringify(data)
                 });
                 const result = await res.json();
-                if (result.success) {
-                    showToast("Profile updated!");
-                    loadAgentProfile(); // Refresh UI
+                if (res.ok && result.success) {
+                    if (showSuccess) showToast("Profile updated!");
+                    await loadAgentProfile();
+                    return true;
                 } else {
-                    showToast(result.message || "Save failed", "error");
+                    showToast(result.message || "Profile update failed.", "error");
                 }
-            } catch (e) { showToast("Save failed", "error"); }
+            } catch (e) {
+                console.error("Profile update failed:", e);
+                showToast("Profile update failed.", "error");
+            }
+            return false;
+        }
+
+        async function updateAvailability(toggle) {
+            const requestedAvailability = toggle.checked ? 'Online' : 'Offline';
+            const updated = await saveAgentProfile(false);
+            if (!updated) {
+                toggle.checked = savedAvailability === 'Online';
+                return;
+            }
+            showToast(`You are now ${requestedAvailability}.`, requestedAvailability === 'Online' ? 'success' : 'info');
         }
 
         function reportIssue() {
-            const msg = prompt("Please describe the issue (e.g. Customer unreachable):");
-            if (msg) showToast("Issue reported to dispatch.", "success");
+            showToast("Issue reporting has not been configured.", "error");
         }
 
         async function loadDeliveries() {
@@ -600,20 +626,38 @@
                 }
                 const data = await res.json();
 
-                if (data.success && data.orders.length > 0) {
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || "Could not load assigned deliveries.");
+                }
+                mapInstances.forEach(map => map.remove());
+                mapInstances.clear();
+                mapTargets.clear();
+
+                if (Array.isArray(data.orders) && data.orders.length > 0) {
                     container.innerHTML = '';
                     data.orders.forEach(o => {
                         const isReady = o.status === 'Ready for Delivery';
                         const isOut = o.status === 'Out for Delivery';
+                        const paymentMethod = escapeHtml(o.payment_method || 'Unknown');
+                        const paymentStatus = String(o.payment_status || 'Pending').toLowerCase();
+                        const paymentBadge = ['paid', 'succeeded', 'completed'].includes(paymentStatus)
+                            ? 'Paid' : 'Payment pending';
+                        const prescription = o.prescription_id
+                            ? `Prescription: ${escapeHtml(o.prescription_status || 'Status unavailable')}`
+                            : 'No prescription attached to this order.';
+                        mapTargets.set(String(o.id), {
+                            address: o.full_address || '',
+                            latitude: o.delivery_latitude,
+                            longitude: o.delivery_longitude
+                        });
 
                         let buttonsHtml = '';
-                        if (o.status === 'Preparing') {
-                            buttonsHtml = `<div style="color:#f59e0b; font-weight:700;">Pharmacy is Preparing...</div>`;
-                        } else if (isReady) {
+                        if (isReady) {
                             buttonsHtml = `<button class="btn btn-primary" onclick="updateStatus(${o.id}, 'Out for Delivery')"><ion-icon name="bicycle"></ion-icon> Start Delivery</button>`;
                         } else if (isOut) {
                             buttonsHtml = `
                                 <button class="btn btn-outline" onclick="toggleMap(${o.id})"><ion-icon name="navigate"></ion-icon> Navigate</button>
+                                <button class="btn btn-outline" onclick="startLocationTracking(${o.id})"><ion-icon name="locate"></ion-icon> Share Location</button>
                                 <button class="btn btn-success" onclick="showPodModal(${o.id})"><ion-icon name="checkmark-circle"></ion-icon> Mark Delivered</button>
                             `;
                         }
@@ -621,19 +665,19 @@
                         container.innerHTML += `
                             <div class="order-card" id="order-${o.id}">
                                 <div class="order-details">
-                                    <div class="order-meta">Order #${o.id} • <span style="background: ${o.payment_method.includes('Paid') ? '#dcfce7; color: #166534' : '#fee2e2; color: #991b1b'}; padding: 2px 6px; border-radius: 4px;">${o.payment_method}</span></div>
+                                    <div class="order-meta">Order #${escapeHtml(o.id)} • <span style="background: ${paymentBadge === 'Paid' ? '#dcfce7; color: #166534' : '#fee2e2; color: #991b1b'}; padding: 2px 6px; border-radius: 4px;">${paymentMethod} · ${paymentBadge}</span></div>
                                     
                                     <div style="background:#f8fafc; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--primary);">
-                                        <div style="font-weight: 700; color: #0f172a; font-size: 13px;">Pickup From: <span style="color:var(--primary)">Main Pharmacy Store</span></div>
+                                        <div style="font-weight: 700; color: #64748b; font-size: 13px;">Pickup location is not configured by dispatch.</div>
                                     </div>
                                     
-                                    <div class="order-address"><ion-icon name="location" style="color:#ef4444;"></ion-icon> Deliver to: ${o.full_address || 'Customer Location'}</div>
+                                    <div class="order-address"><ion-icon name="location" style="color:#ef4444;"></ion-icon> Deliver to: ${escapeHtml(o.full_address || 'Delivery address unavailable')}</div>
                                     
-                                    <div style="margin: 8px 0; color: #ef4444; font-size: 12px; font-weight: 700;">
-                                        <ion-icon name="alert-circle"></ion-icon> Instructions: Require Prescription / Call customer.
+                                    <div style="margin: 8px 0; color: #64748b; font-size: 12px; font-weight: 700;">
+                                        ${prescription}
                                     </div>
                                     
-                                    <div class="order-contact" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;"><ion-icon name="person"></ion-icon> Customer: ${o.customer_name} • <ion-icon name="call"></ion-icon> ${o.customer_phone || 'N/A'}</div>
+                                    <div class="order-contact" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 10px;"><ion-icon name="person"></ion-icon> Customer: ${escapeHtml(o.customer_name || 'Customer')} • <ion-icon name="call"></ion-icon> ${escapeHtml(o.customer_phone || 'N/A')}</div>
                                     
                                     <div id="map-${o.id}" style="width:100%; height:250px; display:none; margin-top:15px; border-radius:12px; z-index: 1;"></div>
                                 </div>
@@ -652,7 +696,10 @@
                         </div>
                     `;
                 }
-            } catch (e) { container.innerHTML = '<p style="color:red;">Failed to connect to Dispatch Server.</p>'; }
+            } catch (e) {
+                console.error("Delivery list load failed:", e);
+                container.innerHTML = `<p style="color:red;">${escapeHtml(e.message || 'Failed to load deliveries.')}</p>`;
+            }
         }
 
         async function updateStatus(id, status) {
@@ -661,22 +708,39 @@
                     method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ status })
                 });
                 const data = await res.json();
-                if (data.success) {
+                if (res.ok && data.success) {
                     showToast(`Status updated to ${status}`);
                     loadDeliveries();
+                    if (status === 'Delivered') {
+                        stopLocationTracking(id);
+                        loadEarnings();
+                    }
+                    return true;
                 } else { showToast(data.message, "error"); }
-            } catch (e) { showToast("Network Error", "error"); }
+            } catch (e) {
+                console.error("Delivery status update failed:", e);
+                showToast("Network Error", "error");
+            }
+            return false;
         }
 
         async function loadEarnings() {
             try {
                 const res = await fetch(`${API_BASE}/api/delivery/earnings`, { headers: getAuthHeaders() });
                 const data = await res.json();
-                if (data.success) {
-                    document.getElementById('totalEarnings').textContent = `₹${data.earnings || 0}`;
-                    document.getElementById('totalTrips').textContent = data.trips || 0;
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || "Could not load delivery totals.");
                 }
-            } catch (e) { console.error(e); }
+                document.getElementById('valEarnings').textContent = data.earningsConfigured
+                    ? `₹${Number(data.earnings).toFixed(2)}` : 'Not configured';
+                document.getElementById('valTrips').textContent = String(Number(data.trips) || 0);
+                document.getElementById('earningsNotice').textContent = data.earningsConfigured
+                    ? 'Payout totals are based on recorded delivery payments.'
+                    : 'Payout rates and payment history have not been configured.';
+            } catch (e) {
+                console.error("Delivery earnings load failed:", e);
+                showToast(e.message || "Could not load delivery totals.", "error");
+            }
         }
 
         async function loadPool() {
@@ -684,19 +748,26 @@
             try {
                 const res = await fetch(`${API_BASE}/api/delivery/pool`, { headers: getAuthHeaders() });
                 const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || "Could not load available orders.");
+                }
                 
-                if (data.success && data.orders.length > 0) {
+                if (Array.isArray(data.orders) && data.orders.length > 0) {
                     container.innerHTML = '';
                     data.orders.forEach(o => {
+                        const paymentMethod = escapeHtml(o.payment_method || 'Unknown');
+                        const paymentStatus = String(o.payment_status || 'Pending').toLowerCase();
+                        const paymentBadge = ['paid', 'succeeded', 'completed'].includes(paymentStatus)
+                            ? 'Paid' : 'Payment pending';
                         container.innerHTML += `
                             <div class="order-card">
                                 <div class="order-details">
-                                    <div class="order-meta">Order #${o.id} • <span style="background: ${o.payment_method.includes('Paid') ? '#dcfce7; color: #166534' : '#fee2e2; color: #991b1b'}; padding: 2px 6px; border-radius: 4px;">${o.payment_method}</span></div>
+                                    <div class="order-meta">Order #${escapeHtml(o.id)} • <span style="background: ${paymentBadge === 'Paid' ? '#dcfce7; color: #166534' : '#fee2e2; color: #991b1b'}; padding: 2px 6px; border-radius: 4px;">${paymentMethod} · ${paymentBadge}</span></div>
                                     <div style="background:#f8fafc; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid var(--primary);">
-                                        <div style="font-weight: 700; color: #0f172a; font-size: 13px;">Pickup From: <span style="color:var(--primary)">Main Pharmacy Store</span></div>
+                                        <div style="font-weight: 700; color: #64748b; font-size: 13px;">Pickup location is not configured by dispatch.</div>
                                     </div>
-                                    <div class="order-address" style="margin-bottom: 5px;"><ion-icon name="location" style="color:#ef4444;"></ion-icon> Deliver To: ${o.full_address || 'Customer Location'}</div>
-                                    <div class="order-contact"><ion-icon name="person"></ion-icon> ${o.customer_name} • <ion-icon name="call"></ion-icon> ${o.customer_phone || 'N/A'}</div>
+                                    <div class="order-address" style="margin-bottom: 5px;"><ion-icon name="location" style="color:#ef4444;"></ion-icon> Deliver To: ${escapeHtml(o.full_address || 'Delivery address unavailable')}</div>
+                                    <div class="order-contact"><ion-icon name="person"></ion-icon> ${escapeHtml(o.customer_name || 'Customer')} • <ion-icon name="call"></ion-icon> ${escapeHtml(o.customer_phone || 'N/A')}</div>
                                 </div>
                                 <div class="action-btns">
                                     <button class="btn btn-primary" onclick="acceptOrder(${o.id})"><ion-icon name="checkmark-circle"></ion-icon> Accept Route</button>
@@ -713,7 +784,10 @@
                         </div>
                     `;
                 }
-            } catch (e) { container.innerHTML = '<p style="color:red;">Failed to connect to Server.</p>'; }
+            } catch (e) {
+                console.error("Delivery pool load failed:", e);
+                container.innerHTML = `<p style="color:red;">${escapeHtml(e.message || 'Failed to load the order pool.')}</p>`;
+            }
         }
 
         async function acceptOrder(id) {
@@ -722,70 +796,126 @@
                     method: 'POST', headers: getAuthHeaders()
                 });
                 const data = await res.json();
-                if (data.success) {
+                if (res.ok && data.success) {
                     showToast("Order Accepted!");
                     loadPool();
-                    // Switch to deliveries tab
-                    document.querySelectorAll('.nav-item')[1].click(); 
+                    switchTab('deliveries', document.getElementById('deliveriesNav'));
                 } else { showToast(data.message, "error"); }
-            } catch(e) { showToast("Network Error", "error"); }
-        }
-
-        function switchTab(tabId, el) {
-            document.querySelectorAll('.tab-panel').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(m => m.classList.remove('active'));
-            document.getElementById('tab-' + tabId).classList.add('active');
-            el.classList.add('active');
-
-            if (tabId === 'pool') loadPool();
-            if (tabId === 'deliveries') loadDeliveries();
-            if (tabId === 'earnings') loadEarnings();
+            } catch(e) {
+                console.error("Accept delivery failed:", e);
+                showToast("Network Error", "error");
+            }
         }
 
         function toggleMap(id) {
             const mapEl = document.getElementById(`map-${id}`);
             if (mapEl.style.display === 'block') {
                 mapEl.style.display = 'none';
+                const existingMap = mapInstances.get(String(id));
+                if (existingMap) {
+                    existingMap.remove();
+                    mapInstances.delete(String(id));
+                }
             } else {
                 mapEl.style.display = 'block';
-                showToast("Opening Navigation...");
-                if (!mapEl.hasChildNodes()) {
-                    const lat = 17.385 + (Math.random() - 0.5) * 0.1;
-                    const lng = 78.486 + (Math.random() - 0.5) * 0.1;
-                    const map = L.map(`map-${id}`).setView([lat, lng], 13);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                    L.marker([lat, lng]).addTo(map).bindPopup('Customer Location').openPopup();
+                const target = mapTargets.get(String(id));
+                const hasCoordinates = target && target.latitude !== null && target.latitude !== undefined &&
+                    target.latitude !== '' && target.longitude !== null && target.longitude !== undefined &&
+                    target.longitude !== '';
+                const latitude = hasCoordinates ? Number(target.latitude) : NaN;
+                const longitude = hasCoordinates ? Number(target.longitude) : NaN;
+                if (Number.isFinite(latitude) && Math.abs(latitude) <= 90 &&
+                    Number.isFinite(longitude) && Math.abs(longitude) <= 180) {
+                    const map = L.map(mapEl).setView([latitude, longitude], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(map);
+                    L.marker([latitude, longitude]).addTo(map).bindPopup('Delivery address').openPopup();
+                    mapInstances.set(String(id), map);
+                } else if (target && target.address) {
+                    const searchUrl = `https://www.openstreetmap.org/search?query=${encodeURIComponent(target.address)}`;
+                    mapEl.innerHTML = `<a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Open the delivery address in OpenStreetMap</a>`;
+                } else {
+                    mapEl.textContent = 'No delivery address or map coordinates are available.';
                 }
             }
         }
 
-        // Init Setup
-        window.socket = io(window.APP_CONFIG ? window.APP_CONFIG.SOCKET_URL : API_BASE);
-        window.socket.on('new_order_pool', () => {
-            showToast("New order available in the pool!", "info");
-            if (document.getElementById('tab-pool').classList.contains('active')) loadPool();
-        });
+        function startLocationTracking(orderId) {
+            const key = String(orderId);
+            if (locationWatchIds.has(key)) {
+                showToast("Location sharing is already active.", "info");
+                return;
+            }
+            if (!navigator.geolocation) {
+                showToast("Location sharing is not supported by this browser.", "error");
+                return;
+            }
 
-        window.socket.on('new_delivery', (data) => {
-            if (data.agentId == currentUser.userId) {
-                showToast(`🚀 New Delivery Assigned to YOU!`, "success");
-                loadDeliveries();
-                // Switch to deliveries tab if they want
-                if (!document.getElementById('tab-deliveries').classList.contains('active')) {
-                     // show notification/prompt?
+            const watchId = navigator.geolocation.watchPosition(async position => {
+                const now = Date.now();
+                if (now - (lastLocationSentAt.get(key) || 0) < 5000) return;
+                lastLocationSentAt.set(key, now);
+                try {
+                    const res = await fetch(`${API_BASE}/api/delivery/order/${encodeURIComponent(orderId)}/location`, {
+                        method: 'PUT',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data.success) {
+                        throw new Error(data.message || "Location update failed.");
+                    }
+                } catch (error) {
+                    console.error("Live location update failed:", error);
+                    showToast("Could not share the live location. Check your connection.", "error");
+                    stopLocationTracking(orderId);
                 }
-            }
-        });
+            }, error => {
+                console.error("Geolocation failed:", error);
+                showToast("Location permission is needed to share your live location.", "error");
+                stopLocationTracking(orderId);
+            }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+            locationWatchIds.set(key, watchId);
+            showToast("Live location sharing started.", "success");
+        }
 
-        loadPool();
-        loadAgentProfile();
-
-        // Auto refresh deliveries every 10 seconds for real-time feel
-        setInterval(() => {
-            if (document.getElementById('tab-deliveries').classList.contains('active')) {
-                loadDeliveries();
+        function stopLocationTracking(orderId) {
+            const key = String(orderId);
+            if (locationWatchIds.has(key)) {
+                navigator.geolocation.clearWatch(locationWatchIds.get(key));
+                locationWatchIds.delete(key);
             }
-        }, 10000);
+            lastLocationSentAt.delete(key);
+        }
+
+        // Init Setup
+        if (validDeliverySession) {
+            window.socket = io(window.APP_CONFIG ? window.APP_CONFIG.SOCKET_URL : API_BASE, {
+                auth: { token: currentUser.token }
+            });
+            window.socket.on('new_order_pool', () => {
+                if (document.getElementById('tab-pool').classList.contains('active')) loadPool();
+            });
+
+            window.socket.on('new_delivery', data => {
+                if (String(data.agentId) === String(currentUser.userId)) {
+                    showToast("A delivery has been assigned to you.", "success");
+                    loadDeliveries();
+                }
+            });
+
+            loadPool();
+            loadAgentProfile();
+            loadEarnings();
+            setInterval(() => {
+                if (document.getElementById('tab-pool').classList.contains('active')) loadPool();
+            }, 30000);
+            window.addEventListener('beforeunload', () => {
+                locationWatchIds.forEach(watchId => navigator.geolocation.clearWatch(watchId));
+                locationWatchIds.clear();
+            });
+        }
     </script>
     <script src="chatWidget.js"></script>
     <script>

@@ -8,6 +8,8 @@ const multer = require("multer");
 const http = require("http");
 const { Server } = require("socket.io");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
+const { OAuth2Client } = require("google-auth-library");
 
 // Initialize Firebase Admin SDK (no service account needed — uses projectId to fetch Google's public keys)
 if (!admin.apps.length) {
@@ -37,10 +39,14 @@ const emailTransporter = nodemailer.createTransport({
 });
 
 
-// google-auth-library is no longer needed; Firebase Admin handles token verification
-
-// Create default JWT Secret if none provided in .env
-const JWT_SECRET = process.env.JWT_SECRET || "pharma_wave_secure_super_secret_key_production";
+const JWT_SECRET = process.env.JWT_SECRET || (
+    process.env.NODE_ENV === 'production' ? null : crypto.randomBytes(32).toString('hex')
+);
+if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET must be configured in production.");
+}
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '528351606474-fd3vem1np095i69ivpli62jefr5rfc61.apps.googleusercontent.com';
+const googleOAuthClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const app = express();
 const server = http.createServer(app);
@@ -48,6 +54,31 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST", "PUT", "DELETE"]
+    }
+});
+
+io.use((socket, next) => {
+    const token = socket.handshake.auth && socket.handshake.auth.token;
+    if (typeof token !== 'string' || token.length === 0) {
+        return next(new Error("Authentication required."));
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err || !user || !user.id || !user.role) {
+            return next(new Error("Invalid authentication token."));
+        }
+        socket.data.user = user;
+        next();
+    });
+});
+
+io.on('connection', socket => {
+    const user = socket.data.user;
+    const userId = String(user.id);
+    socket.join(`user:${userId}`);
+    if (user.role === 'delivery') {
+        socket.join('delivery:pool');
+        socket.join(`delivery:${userId}`);
     }
 });
 
@@ -98,6 +129,17 @@ app.get("/", (req, res) => {
 
 let pool;
 
+async function ensureColumn(table, column, definition) {
+    const [rows] = await pool.query(
+        `SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [table, column]
+    );
+    if (rows.length === 0) {
+        await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    }
+}
+
 async function initDB() {
     try {
         const dbUrl = process.env.DATABASE_URL || process.env.DB_URL;
@@ -131,11 +173,14 @@ async function initDB() {
             contact VARCHAR(255),
             full_name VARCHAR(255),
             profile_pic LONGTEXT,
+            membership_id VARCHAR(64) DEFAULT NULL,
+            created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
             role VARCHAR(50) DEFAULT 'user',
             vehicle_type VARCHAR(50),
             vehicle_number VARCHAR(100),
             availability VARCHAR(50) DEFAULT 'Online',
             reset_token VARCHAR(255),
+            reset_token_expires_at DATETIME NULL,
             email_notifications BOOLEAN DEFAULT TRUE,
             sms_alerts BOOLEAN DEFAULT TRUE,
             cart_data LONGTEXT
@@ -154,25 +199,6 @@ async function initDB() {
             discount DECIMAL(10, 2) DEFAULT 0.00,
             min_stock INT DEFAULT 10,
             is_active BOOLEAN DEFAULT TRUE
-        )`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS orders (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT,
-            order_number VARCHAR(50) UNIQUE,
-            total_amount DECIMAL(10, 2) NOT NULL,
-            subtotal DECIMAL(10, 2) DEFAULT 0.00,
-            delivery_charge DECIMAL(10, 2) DEFAULT 0.00,
-            status VARCHAR(50) DEFAULT 'Pending',
-            payment_method VARCHAR(50) DEFAULT 'COD',
-            payment_status VARCHAR(50) DEFAULT 'Pending',
-            address_id INT,
-            prescription_id INT,
-            agent_id INT,
-            schedule VARCHAR(50) DEFAULT 'ASAP',
-            delivery_rating INT DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (address_id) REFERENCES addresses(id)
         )`);
         await pool.query(`CREATE TABLE IF NOT EXISTS addresses (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -193,6 +219,25 @@ async function initDB() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            order_number VARCHAR(50) UNIQUE,
+            total_amount DECIMAL(10, 2) NOT NULL,
+            subtotal DECIMAL(10, 2) DEFAULT 0.00,
+            delivery_charge DECIMAL(10, 2) DEFAULT 0.00,
+            status VARCHAR(50) DEFAULT 'Pending',
+            payment_method VARCHAR(50) DEFAULT 'COD',
+            payment_status VARCHAR(50) DEFAULT 'Pending',
+            address_id INT,
+            prescription_id INT,
+            agent_id INT,
+            schedule VARCHAR(50) DEFAULT 'ASAP',
+            delivery_rating INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (address_id) REFERENCES addresses(id)
         )`);
         await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -230,46 +275,55 @@ async function initDB() {
         await pool.query(`CREATE TABLE IF NOT EXISTS user_cards (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, card_title VARCHAR(100), card_number VARCHAR(20), expiry VARCHAR(10), FOREIGN KEY (user_id) REFERENCES users(id))`);
         await pool.query(`CREATE TABLE IF NOT EXISTS consultations (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, doctor_name VARCHAR(255), subject VARCHAR(255), date DATE, time TIME, status VARCHAR(50) DEFAULT 'Booked', FOREIGN KEY (user_id) REFERENCES users(id))`);
 
-        // 2. Run Migrations / Alterations
-        try { await pool.query("ALTER TABLE users ADD COLUMN full_name VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN email_notifications BOOLEAN DEFAULT TRUE"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN sms_alerts BOOLEAN DEFAULT TRUE"); } catch (e) { }
-        try { await pool.query("ALTER TABLE users ADD COLUMN cart_data LONGTEXT"); } catch (e) { }
-        try { await pool.query("ALTER TABLE products ADD COLUMN prescription_required BOOLEAN DEFAULT FALSE"); } catch (e) { }
-        try { await pool.query("ALTER TABLE products ADD COLUMN manufacturer VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE products ADD COLUMN discount DECIMAL(10, 2) DEFAULT 0.00"); } catch (e) { }
-        try { await pool.query("ALTER TABLE products ADD COLUMN min_stock INT DEFAULT 10"); } catch (e) { }
-        try { await pool.query("ALTER TABLE products ADD COLUMN is_active BOOLEAN DEFAULT TRUE"); } catch (e) { }
-        try { await pool.query("ALTER TABLE products ADD COLUMN expiry_date DATE"); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN order_number VARCHAR(50) UNIQUE`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN subtotal DECIMAL(10, 2) DEFAULT 0.00`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN delivery_charge DECIMAL(10, 2) DEFAULT 0.00`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) DEFAULT 'Pending'`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN prescription_id INT`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN agent_id INT`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN address_id INT`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50) DEFAULT 'COD'`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN schedule VARCHAR(50) DEFAULT 'ASAP'`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN delivery_rating INT DEFAULT NULL`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN lat DECIMAL(10, 8)`); } catch (e) { }
-        try { await pool.query(`ALTER TABLE orders ADD COLUMN lng DECIMAL(11, 8)`); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN title VARCHAR(100) NOT NULL DEFAULT 'Home'"); } catch (e) { }
-        try { await pool.query("UPDATE addresses SET title = COALESCE(title, label, 'Home') WHERE title IS NULL OR title = ''"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN full_name VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN mobile VARCHAR(20)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN house_number VARCHAR(100)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN street VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN city VARCHAR(120)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN state VARCHAR(120)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN pincode VARCHAR(20)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN landmark VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN label VARCHAR(50)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN latitude DECIMAL(10, 8)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE addresses ADD COLUMN longitude DECIMAL(11, 8)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE prescriptions ADD COLUMN file_name VARCHAR(255)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE prescriptions ADD COLUMN mime_type VARCHAR(100)"); } catch (e) { }
-        try { await pool.query("ALTER TABLE prescriptions ADD COLUMN file_size INT DEFAULT 0"); } catch (e) { }
-        try { await pool.query("CREATE TABLE IF NOT EXISTS payments (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, order_id INT NOT NULL, amount DECIMAL(10,2) NOT NULL, payment_method VARCHAR(50) NOT NULL, payment_status VARCHAR(50) DEFAULT 'Pending', transaction_reference VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (order_id) REFERENCES orders(id))"); } catch (e) { }
+        // 2. Run idempotent migrations. Migration errors must stop startup rather than
+        // leave the application running against a partially upgraded schema.
+        const migrations = [
+            ['users', 'full_name', 'VARCHAR(255)'],
+            ['users', 'membership_id', 'VARCHAR(64) DEFAULT NULL'],
+            ['users', 'created_at', 'TIMESTAMP NULL DEFAULT NULL'],
+            ['users', 'email_notifications', 'BOOLEAN DEFAULT TRUE'],
+            ['users', 'sms_alerts', 'BOOLEAN DEFAULT TRUE'],
+            ['users', 'cart_data', 'LONGTEXT'],
+            ['users', 'reset_token_expires_at', 'DATETIME NULL'],
+            ['products', 'prescription_required', 'BOOLEAN DEFAULT FALSE'],
+            ['products', 'manufacturer', 'VARCHAR(255)'],
+            ['products', 'discount', 'DECIMAL(10, 2) DEFAULT 0.00'],
+            ['products', 'min_stock', 'INT DEFAULT 10'],
+            ['products', 'is_active', 'BOOLEAN DEFAULT TRUE'],
+            ['products', 'expiry_date', 'DATE'],
+            ['orders', 'order_number', 'VARCHAR(50) UNIQUE'],
+            ['orders', 'subtotal', 'DECIMAL(10, 2) DEFAULT 0.00'],
+            ['orders', 'delivery_charge', 'DECIMAL(10, 2) DEFAULT 0.00'],
+            ['orders', 'payment_status', "VARCHAR(50) DEFAULT 'Pending'"],
+            ['orders', 'prescription_id', 'INT'],
+            ['orders', 'agent_id', 'INT'],
+            ['orders', 'address_id', 'INT'],
+            ['orders', 'payment_method', "VARCHAR(50) DEFAULT 'COD'"],
+            ['orders', 'schedule', "VARCHAR(50) DEFAULT 'ASAP'"],
+            ['orders', 'delivery_rating', 'INT DEFAULT NULL'],
+            ['orders', 'lat', 'DECIMAL(10, 8)'],
+            ['orders', 'lng', 'DECIMAL(11, 8)'],
+            ['addresses', 'title', "VARCHAR(100) NOT NULL DEFAULT 'Home'"],
+            ['addresses', 'full_name', 'VARCHAR(255)'],
+            ['addresses', 'mobile', 'VARCHAR(20)'],
+            ['addresses', 'house_number', 'VARCHAR(100)'],
+            ['addresses', 'street', 'VARCHAR(255)'],
+            ['addresses', 'city', 'VARCHAR(120)'],
+            ['addresses', 'state', 'VARCHAR(120)'],
+            ['addresses', 'pincode', 'VARCHAR(20)'],
+            ['addresses', 'landmark', 'VARCHAR(255)'],
+            ['addresses', 'label', 'VARCHAR(50)'],
+            ['addresses', 'latitude', 'DECIMAL(10, 8)'],
+            ['addresses', 'longitude', 'DECIMAL(11, 8)'],
+            ['prescriptions', 'file_name', 'VARCHAR(255)'],
+            ['prescriptions', 'mime_type', 'VARCHAR(100)'],
+            ['prescriptions', 'file_size', 'INT DEFAULT 0']
+        ];
+        for (const [table, column, definition] of migrations) {
+            await ensureColumn(table, column, definition);
+        }
+        await pool.query("ALTER TABLE users MODIFY COLUMN created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP");
+        await pool.query("UPDATE addresses SET title = COALESCE(title, label, 'Home') WHERE title IS NULL OR title = ''");
 
         console.log("Database tables initialized successfully.");
 
@@ -318,10 +372,9 @@ async function initDB() {
 
     } catch (err) {
         console.error("Database initialization failed:", err);
+        throw err;
     }
 }
-
-initDB();
 
 // ==========================================
 // AUTHENTICATION MIDDLEWARE
@@ -358,6 +411,34 @@ function isValidEmail(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function isValidPassword(value) {
+    return typeof value === 'string' &&
+        value.length >= 8 &&
+        /^[A-Z]/.test(value) &&
+        /[0-9]/.test(value) &&
+        /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(value);
+}
+
+async function verifyUserPassword(user, password) {
+    if (/^\$2[aby]\$/.test(user.password || '') && await bcrypt.compare(password, user.password)) return true;
+    if (password !== user.password) return false;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query(
+        "UPDATE users SET password = ? WHERE id = ? AND password = ?",
+        [hashedPassword, user.id, user.password]
+    );
+    return true;
+}
+
+function createAuthToken(user, role = user.role || 'user') {
+    return jwt.sign(
+        { id: user.id, username: user.username, role },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+    );
+}
+
 function sanitizeText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
@@ -374,24 +455,135 @@ function normalizeUserProfilePayload(payload = {}) {
 
 function validateAddressPayload(payload) {
     const errors = [];
-    const hasStructuredAddress = Boolean(payload.house_number || payload.street || payload.city || payload.state || payload.pincode);
-    const legacyFullAddress = Boolean((payload.full_address || payload.fullAddress) && !hasStructuredAddress);
-
-    if (legacyFullAddress) {
-        return errors;
-    }
 
     if (!payload.full_name) errors.push('Full name is required.');
-    if (!payload.mobile) errors.push('A valid 10-digit mobile number is required.');
+    if (!payload.mobile || !isValidPhone(payload.mobile)) errors.push('A valid 10-digit mobile number is required.');
+    if (payload.label.length > 50) errors.push('Address label must be 50 characters or fewer.');
+    if (payload.full_address.length > 2000) errors.push('Address must be 2000 characters or fewer.');
+
+    if ((payload.latitude === null) !== (payload.longitude === null) ||
+        (payload.latitude !== null && (!Number.isFinite(payload.latitude) || Math.abs(payload.latitude) > 90)) ||
+        (payload.longitude !== null && (!Number.isFinite(payload.longitude) || Math.abs(payload.longitude) > 180))) {
+        errors.push('Location coordinates are invalid.');
+    }
+
+    if (payload.full_address) return errors;
+
     if (!payload.house_number) errors.push('House or flat number is required.');
     if (!payload.street) errors.push('Street or area is required.');
     if (!payload.city) errors.push('City is required.');
     if (!payload.state) errors.push('State is required.');
     if (!payload.pincode) errors.push('Pincode must be a 6-digit number.');
 
-    if (payload.mobile && !isValidPhone(payload.mobile)) errors.push('A valid 10-digit mobile number is required.');
     if (payload.pincode && !/^\d{6}$/.test(String(payload.pincode).trim())) errors.push('Pincode must be a 6-digit number.');
     return errors;
+}
+
+function normalizeAddressPayload(body = {}) {
+    const latitude = body.latitude === undefined || body.latitude === null || body.latitude === ''
+        ? null
+        : Number(body.latitude);
+    const longitude = body.longitude === undefined || body.longitude === null || body.longitude === ''
+        ? null
+        : Number(body.longitude);
+    const label = sanitizeText(body.label || body.title || 'Home');
+
+    return {
+        full_name: sanitizeText(body.full_name || body.name || ''),
+        mobile: normalizePhone(body.mobile || body.contact || ''),
+        house_number: sanitizeText(body.house_number || body.flat_number || ''),
+        street: sanitizeText(body.street || body.area || ''),
+        city: sanitizeText(body.city || ''),
+        state: sanitizeText(body.state || ''),
+        pincode: sanitizeText(body.pincode || ''),
+        landmark: sanitizeText(body.landmark || ''),
+        title: label,
+        label,
+        full_address: sanitizeText(body.full_address || body.fullAddress || ''),
+        is_default: body.is_default === true || body.is_default === 1 || body.is_default === '1' ||
+            (typeof body.is_default === 'string' && body.is_default.toLowerCase() === 'true'),
+        latitude,
+        longitude
+    };
+}
+
+async function persistAddress(userId, payload, addressId = null) {
+    const connection = await pool.getConnection();
+    let transactionStarted = false;
+    try {
+        await connection.beginTransaction();
+        transactionStarted = true;
+        const [users] = await connection.query("SELECT id FROM users WHERE id = ? FOR UPDATE", [userId]);
+        if (users.length === 0) {
+            throw Object.assign(new Error('User not found.'), { status: 404 });
+        }
+
+        const [existingAddresses] = await connection.query(
+            "SELECT id, is_default FROM addresses WHERE user_id = ? ORDER BY id DESC",
+            [userId]
+        );
+        const existingAddress = addressId
+            ? existingAddresses.find(address => String(address.id) === String(addressId))
+            : null;
+        if (addressId && !existingAddress) {
+            throw Object.assign(new Error('Address not found.'), { status: 404 });
+        }
+
+        const hasDefaultAddress = existingAddresses.some(address => Boolean(address.is_default));
+        const shouldBeDefault = payload.is_default ||
+            !hasDefaultAddress ||
+            Boolean(existingAddress && existingAddress.is_default);
+        if (shouldBeDefault) {
+            await connection.query("UPDATE addresses SET is_default = FALSE WHERE user_id = ?", [userId]);
+        }
+
+        const fullAddress = payload.full_address || buildAddressString(payload);
+        let savedAddressId = addressId;
+        if (addressId) {
+            const [result] = await connection.query(
+                `UPDATE addresses
+                 SET full_name = ?, mobile = ?, house_number = ?, street = ?, city = ?, state = ?,
+                     pincode = ?, landmark = ?, label = ?, full_address = ?, latitude = ?, longitude = ?, is_default = ?
+                 WHERE id = ? AND user_id = ?`,
+                [
+                    payload.full_name, payload.mobile, payload.house_number, payload.street, payload.city,
+                    payload.state, payload.pincode, payload.landmark, payload.label, fullAddress,
+                    payload.latitude, payload.longitude, shouldBeDefault ? 1 : 0, addressId, userId
+                ]
+            );
+            if (result.affectedRows === 0) {
+                throw Object.assign(new Error('Address not found.'), { status: 404 });
+            }
+        } else {
+            const [result] = await connection.query(
+                `INSERT INTO addresses
+                 (user_id, full_name, mobile, house_number, street, city, state, pincode, landmark, label,
+                  full_address, latitude, longitude, is_default)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    userId, payload.full_name, payload.mobile, payload.house_number, payload.street, payload.city,
+                    payload.state, payload.pincode, payload.landmark, payload.label, fullAddress,
+                    payload.latitude, payload.longitude, shouldBeDefault ? 1 : 0
+                ]
+            );
+            savedAddressId = result.insertId;
+        }
+
+        await connection.commit();
+        transactionStarted = false;
+        return savedAddressId;
+    } catch (err) {
+        if (transactionStarted) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error('Address transaction rollback failed:', rollbackError);
+            }
+        }
+        throw err;
+    } finally {
+        connection.release();
+    }
 }
 
 function normalizeAddressRow(row = {}) {
@@ -498,8 +690,10 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     try {
         const { role, username, email } = req.body;
         const identifier = normalizeIdentifier(email || username || '');
+        if (!identifier) {
+            return res.status(400).json({ success: false, message: "Email or username is required." });
+        }
 
-        // Find user by username or email in a case-insensitive way
         let query = "SELECT id, email, username FROM users WHERE (LOWER(username) = ? OR LOWER(email) = ?)";
         const params = [identifier, identifier];
         if (role) {
@@ -507,78 +701,63 @@ app.post("/api/auth/forgot-password", async (req, res) => {
             params.push(String(role).toLowerCase());
         }
         const [rows] = await pool.query(query, params);
+        const genericResponse = {
+            success: true,
+            message: "If an account matches that information, a reset code will be emailed."
+        };
 
-        if (rows.length > 0) {
-            const user = rows[0];
-            const userEmail = user.email;
-
-            if (!userEmail) {
-                return res.status(400).json({ success: false, message: "No email associated with this account." });
-            }
-
-            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-            await pool.query("UPDATE users SET reset_token = ? WHERE id = ?", [otpCode, user.id]);
-
-            // Send OTP email via Nodemailer
-            const mailOptions = {
-                from: `"PharmaWave" <${process.env.EMAIL_USER}>`,
-                to: userEmail,
-                subject: 'Password Reset Code — PharmaWave',
-                html: `
-                    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0f172a; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
-                        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 24px; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">PharmaWave</h1>
-                            <p style="color: #d1fae5; margin: 8px 0 0; font-size: 14px;">Password Reset Request</p>
-                        </div>
-                        <div style="padding: 32px 24px;">
-                            <p style="color: #e2e8f0; font-size: 15px; line-height: 1.6; margin: 0 0 16px;">Hi <strong>${user.username}</strong>,</p>
-                            <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">Use the code below to reset your password. This code expires in 10 minutes.</p>
-                            <div style="background: #1e293b; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
-                                <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #10b981;">${otpCode}</span>
-                            </div>
-                            <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">If you didn't request this, you can safely ignore this email. Your password will remain unchanged.</p>
-                        </div>
-                        <div style="padding: 16px 24px; border-top: 1px solid #1e293b; text-align: center;">
-                            <p style="color: #475569; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} PharmaWave. All rights reserved.</p>
-                        </div>
-                    </div>
-                `
-            };
-
-            // Wrap sendMail in a promise race to enforce a timeout (solves infinite hang on Render free tier)
-            const sendEmailWithTimeout = new Promise((resolve, reject) => {
-                const timer = setTimeout(() => {
-                    reject(new Error("SMTP Connection Timed Out. If local, your internet might be slow or ISP blocks SMTP."));
-                }, 4000); // 4-second timeout for a better UX when blocked
-                
-                emailTransporter.sendMail(mailOptions)
-                    .then(() => {
-                        clearTimeout(timer);
-                        resolve();
-                    })
-                    .catch((err) => {
-                        clearTimeout(timer);
-                        reject(err);
-                    });
-            });
-
-            try {
-                await sendEmailWithTimeout;
-                console.log(`Password reset OTP sent to ${userEmail}`);
-                res.json({ success: true, message: "OTP sent to your email!" });
-            } catch (err) {
-                console.error(`[SMTP ERROR] Failed to send email to ${userEmail}:`, err.message);
-                // Fallback to showing the OTP so testing can continue
-                console.log(`[FALLBACK] Password reset OTP for ${userEmail} is ${otpCode}`);
-                res.json({ 
-                    success: true, 
-                    message: `OTP generated: ${otpCode}`,
-                    fallbackOtp: otpCode
-                });
-            }
-        } else {
-            res.status(404).json({ success: false, message: "No matching account found." });
+        if (rows.length === 0 || !rows[0].email) {
+            return res.json(genericResponse);
         }
+
+        const user = rows[0];
+        const otpCode = String(crypto.randomInt(100000, 1000000));
+        const resetToken = crypto.createHash('sha256').update(otpCode).digest('hex');
+        const mailOptions = {
+            from: `"PharmaWave" <${process.env.EMAIL_USER}>`,
+            to: user.email,
+            subject: 'Password Reset Code — PharmaWave',
+            html: `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0f172a; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
+                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 24px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">PharmaWave</h1>
+                        <p style="color: #d1fae5; margin: 8px 0 0; font-size: 14px;">Password Reset Request</p>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                        <p style="color: #e2e8f0; font-size: 15px; line-height: 1.6; margin: 0 0 16px;">Hi <strong>${user.username}</strong>,</p>
+                        <p style="color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">Use the code below to reset your password. This code expires in 10 minutes.</p>
+                        <div style="background: #1e293b; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+                            <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #10b981;">${otpCode}</span>
+                        </div>
+                        <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">If you didn't request this, you can safely ignore this email. Your password will remain unchanged.</p>
+                    </div>
+                    <div style="padding: 16px 24px; border-top: 1px solid #1e293b; text-align: center;">
+                        <p style="color: #475569; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} PharmaWave. All rights reserved.</p>
+                    </div>
+                </div>
+            `
+        };
+
+        let timeout;
+        try {
+            await Promise.race([
+                emailTransporter.sendMail(mailOptions),
+                new Promise((_, reject) => {
+                    timeout = setTimeout(() => reject(new Error("SMTP connection timed out.")), 10000);
+                })
+            ]);
+        } catch (err) {
+            console.error("Password reset email delivery failed:", err.message);
+            return res.status(503).json({ success: false, message: "Unable to send the reset email. Please try again later." });
+        } finally {
+            clearTimeout(timeout);
+        }
+
+        await pool.query(
+            "UPDATE users SET reset_token = ?, reset_token_expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE id = ?",
+            [resetToken, user.id]
+        );
+        return res.json(genericResponse);
     } catch (err) {
         console.error("Forgot password error:", err);
         res.status(500).json({ success: false, message: "Failed to send reset email. Please try again." });
@@ -588,34 +767,43 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 // RESET PASSWORD API
 app.post("/api/auth/reset-password", async (req, res) => {
     try {
-        let { email, otp, newPassword } = req.body;
-        
-        if (otp !== undefined && otp !== null) {
-            otp = String(otp).replace(/\D/g, '').trim();
+        const { email, otp, newPassword } = req.body;
+        const identifier = normalizeIdentifier(email || '');
+        const otpCode = String(otp || '').replace(/\D/g, '');
+
+        if (!identifier || otpCode.length !== 6 || !newPassword) {
+            return res.status(400).json({ success: false, message: "Email, 6-digit OTP, and new password are required." });
+        }
+        if (!isValidPassword(newPassword)) {
+            return res.status(400).json({ success: false, message: "Password must start with an uppercase letter, contain a number and special character, and be at least 8 characters." });
         }
 
-        if (!otp || !newPassword) return res.status(400).json({ success: false, message: "OTP and new password required" });
-
-        let query = "SELECT id FROM users WHERE reset_token = ?";
-        let params = [otp];
-
-        if (email) {
-            query += " AND (email = ? OR username = ?)";
-            params.push(email, email);
+        const resetToken = crypto.createHash('sha256').update(otpCode).digest('hex');
+        const [rows] = await pool.query(
+            `SELECT id FROM users
+             WHERE reset_token = ? AND reset_token_expires_at > NOW()
+               AND (LOWER(email) = ? OR LOWER(username) = ?)
+             LIMIT 1`,
+            [resetToken, identifier, identifier]
+        );
+        if (rows.length === 0) {
+            return res.status(400).json({ success: false, message: "Invalid or expired OTP." });
         }
 
-        const [rows] = await pool.query(query, params);
-
-        if (rows.length > 0) {
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
-            await pool.query("UPDATE users SET password = ?, reset_token = NULL WHERE id = ?", [hashedPassword, rows[0].id]);
-            res.json({ success: true, message: "Password updated successfully" });
-        } else {
-            res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const [result] = await pool.query(
+            `UPDATE users
+             SET password = ?, reset_token = NULL, reset_token_expires_at = NULL
+             WHERE id = ? AND reset_token = ? AND reset_token_expires_at > NOW()`,
+            [hashedPassword, rows[0].id, resetToken]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ success: false, message: "Invalid or expired OTP." });
         }
+        res.json({ success: true, message: "Password updated successfully." });
     } catch (err) {
         console.error("Reset password error:", err);
-        res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+        res.status(500).json({ success: false, message: "Server error resetting password." });
     }
 });
 
@@ -624,12 +812,15 @@ app.post("/register", async (req, res) => {
     try {
         const { username, password, contact, email, full_name } = req.body;
         const rawContact = sanitizeText(contact || '');
-        const emailValue = sanitizeText(email || (rawContact.includes('@') ? rawContact : ''));
+        const emailValue = sanitizeText(email || (rawContact.includes('@') ? rawContact : '')).toLowerCase();
         const mobileValue = email ? normalizePhone(rawContact) : (rawContact.includes('@') ? '' : normalizePhone(rawContact));
         const normalizedUsername = sanitizeText(username);
 
         if (!normalizedUsername || !password || (!emailValue && !mobileValue)) {
             return res.status(400).json({ success: false, message: "All fields are required" });
+        }
+        if (!isValidPassword(password)) {
+            return res.status(400).json({ success: false, message: "Password must start with an uppercase letter, contain a number and special character, and be at least 8 characters." });
         }
 
         if (mobileValue && !isValidPhone(mobileValue)) {
@@ -655,11 +846,7 @@ app.post("/register", async (req, res) => {
         await pool.query(query, [normalizedUsername, hashedPassword, emailValue || null, mobileValue || null, sanitizeText(full_name || '')]);
 
         const [newUser] = await pool.query(`SELECT id, role FROM users WHERE LOWER(username) = LOWER(?)`, [normalizedUsername]);
-        const token = jwt.sign(
-            { id: newUser[0].id, username: normalizedUsername, role: newUser[0].role || 'user' },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+        const token = createAuthToken({ id: newUser[0].id, username: normalizedUsername, role: newUser[0].role });
 
         res.json({ 
             success: true, 
@@ -676,43 +863,39 @@ app.post("/register", async (req, res) => {
     }
 });
 
-// LOGIN API — Includes fallback for demo when DB is down
+// LOGIN API
 app.post("/login", async (req, res) => {
     const { email, username, password } = req.body;
     const loginIdentifier = normalizeIdentifier(email || username || "");
 
-    if (!loginIdentifier || !password) {
+    if (!loginIdentifier || typeof password !== 'string' || password.length === 0) {
         return res.status(400).json({ success: false, message: "Credentials required" });
     }
 
     try {
-        const query = `SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?`;
-        const [rows] = await pool.query(query, [loginIdentifier, loginIdentifier]);
+        const phoneIdentifier = /^[+()\d\s-]+$/.test(loginIdentifier) && isValidPhone(loginIdentifier)
+            ? normalizePhone(loginIdentifier)
+            : null;
+        const phoneClause = phoneIdentifier ? " OR contact = ?" : "";
+        const query = `SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?${phoneClause}`;
+        const params = [loginIdentifier, loginIdentifier];
+        if (phoneIdentifier) params.push(phoneIdentifier);
+        const [rows] = await pool.query(query, params);
 
-        if (rows.length > 0) {
-            const user = rows[0];
-            const isMatch = await bcrypt.compare(password, user.password);
-            const isLegacyMatch = password === user.password;
-
-            if (isMatch || isLegacyMatch) {
-                const token = jwt.sign(
-                    { id: user.id, username: user.username, role: user.role || 'user' },
-                    JWT_SECRET, { expiresIn: '24h' }
-                );
-                return res.json({
-                    success: true,
-                    token, userId: user.id, username: user.username,
-                    profile_pic: user.profile_pic, role: user.role || 'user'
-                });
-            }
-            // User found but password wrong — return immediately, do NOT fall to hardcoded fallback
-            return res.status(401).json({ success: false, message: "Invalid credentials. Please check your password." });
+        if (rows.length === 0 || !await verifyUserPassword(rows[0], password)) {
+            return res.status(401).json({ success: false, message: "Invalid credentials." });
         }
-        // User not found in DB — throw to trigger fallback demo credentials check
-        throw new Error("User not found in DB");
+
+        const user = rows[0];
+        const token = createAuthToken(user);
+        return res.json({
+            success: true,
+            token, userId: user.id, username: user.username,
+            profile_pic: user.profile_pic, role: user.role || 'user'
+        });
     } catch (err) {
-        console.error("Login DB error:", err.message);
-        res.status(401).json({ success: false, message: "Invalid credentials." });
+        console.error("Login failed:", err);
+        res.status(500).json({ success: false, message: "Server error during login." });
     }
 });
 
@@ -721,31 +904,33 @@ app.post("/api/agent/login", async (req, res) => {
     try {
         const { username, password } = req.body;
         const identifier = normalizeIdentifier(username || '');
-        // Support both username and email as login identifiers in a case-insensitive way
-        const [rows] = await pool.query("SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?", [identifier, identifier]);
+        if (!identifier || typeof password !== 'string' || password.length === 0) {
+            return res.status(400).json({ success: false, message: "Credentials required." });
+        }
+        const phoneIdentifier = /^[+()\d\s-]+$/.test(identifier) && isValidPhone(identifier)
+            ? normalizePhone(identifier)
+            : null;
+        const phoneClause = phoneIdentifier ? " OR contact = ?" : "";
+        const params = [identifier, identifier];
+        if (phoneIdentifier) params.push(phoneIdentifier);
+        const [rows] = await pool.query(
+            `SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?${phoneClause}`,
+            params
+        );
 
         if (rows.length > 0) {
             const user = rows[0];
-
-            // STRICT ROLE CHECK
             if (user.role !== 'delivery') {
-                return res.json({
+                return res.status(401).json({
                     success: false,
-                    message: "Unauthorized: Customers cannot log in to the delivery system."
+                    message: "Invalid agent credentials."
                 });
             }
 
-            const isMatch = await bcrypt.compare(password, user.password);
-            const isLegacyMatch = password === user.password;
+            if (await verifyUserPassword(user, password)) {
+                const token = createAuthToken(user, 'delivery');
 
-            if (isMatch || isLegacyMatch) {
-                const token = jwt.sign(
-                    { id: user.id, username: user.username, role: 'delivery' },
-                    JWT_SECRET,
-                    { expiresIn: '24h' }
-                );
-
-                res.json({
+                return res.json({
                     success: true,
                     message: "Agent access granted!",
                     token: token,
@@ -754,15 +939,12 @@ app.post("/api/agent/login", async (req, res) => {
                     profile_pic: user.profile_pic,
                     role: 'delivery'
                 });
-            } else {
-                res.json({ success: false, message: "Invalid agent credentials" });
             }
-        } else {
-            res.json({ success: false, message: "Invalid agent credentials" });
         }
+        return res.status(401).json({ success: false, message: "Invalid agent credentials." });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Server error" });
+        console.error("Agent login failed:", err);
+        res.status(500).json({ success: false, message: "Server error during agent login." });
     }
 });
 
@@ -771,14 +953,24 @@ app.post("/api/agent/register", async (req, res) => {
     try {
         const { username, password, contact } = req.body;
         const normalizedUsername = sanitizeText(username);
+        const rawContact = sanitizeText(contact);
+        const emailValue = rawContact.includes('@') ? rawContact.toLowerCase() : '';
+        const contactValue = emailValue || normalizePhone(rawContact);
 
-        if (!normalizedUsername || !password || !contact) {
+        if (!normalizedUsername || !password || !contactValue) {
             return res.status(400).json({ success: false, message: "All fields are required" });
+        }
+        if (!isValidPassword(password)) {
+            return res.status(400).json({ success: false, message: "Password must start with an uppercase letter, contain a number and special character, and be at least 8 characters." });
+        }
+        if ((emailValue && !isValidEmail(emailValue)) || (!emailValue && !isValidPhone(contactValue))) {
+            return res.status(400).json({ success: false, message: "Enter a valid email address or 10-digit mobile number." });
         }
 
         const [existingUser] = await pool.query(
-            `SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)`,
-            [normalizedUsername, String(contact).trim()]
+            `SELECT id FROM users
+             WHERE LOWER(username) = LOWER(?) OR LOWER(email) = ? OR contact = ?`,
+            [normalizedUsername, emailValue, contactValue]
         );
 
         if (existingUser.length > 0) {
@@ -787,24 +979,94 @@ app.post("/api/agent/register", async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const query = `INSERT INTO users (username, password, email, contact, role) VALUES (?, ?, ?, ?, 'delivery')`;
- 
-        // Populate both for compatibility
-        await pool.query(query, [normalizedUsername, hashedPassword, contact.includes('@') ? contact : null, contact]);
+        await pool.query(query, [normalizedUsername, hashedPassword, emailValue || null, contactValue]);
 
-        const [newUser] = await pool.query(`SELECT id FROM users WHERE LOWER(username) = LOWER(?)`, [normalizedUsername]);
-        const token = jwt.sign(
-            { id: newUser[0].id, username: normalizedUsername, role: 'delivery' },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
+        const [newUser] = await pool.query(`SELECT id, profile_pic FROM users WHERE LOWER(username) = LOWER(?)`, [normalizedUsername]);
+        const user = { id: newUser[0].id, username: normalizedUsername, role: 'delivery' };
+        const token = createAuthToken(user);
 
-        res.json({ success: true, message: "Agent registered successfully!", token: token, role: 'delivery' });
+        res.json({
+            success: true,
+            message: "Agent registered successfully!",
+            token,
+            userId: user.id,
+            username: user.username,
+            profile_pic: newUser[0].profile_pic,
+            role: 'delivery'
+        });
     } catch (err) {
         if (err.code === "ER_DUP_ENTRY") {
             return res.status(400).json({ success: false, message: "Username or email already exists" });
         }
         console.error("Agent Registration Error:", err);
         res.status(500).send({ message: "Server error" });
+    }
+});
+
+app.post("/api/agent/register/google", async (req, res) => {
+    const credential = req.body && req.body.credential;
+    if (typeof credential !== 'string' || !credential) {
+        return res.status(400).json({ success: false, message: "Google credential is required." });
+    }
+
+    let profile;
+    try {
+        const ticket = await googleOAuthClient.verifyIdToken({
+            idToken: credential,
+            audience: GOOGLE_CLIENT_ID
+        });
+        profile = ticket.getPayload();
+    } catch (err) {
+        return res.status(401).json({ success: false, message: "Google credential is invalid or expired." });
+    }
+
+    const email = String(profile && profile.email || '').trim().toLowerCase();
+    if (!email || profile.email_verified !== true) {
+        return res.status(401).json({ success: false, message: "A verified Google email is required." });
+    }
+
+    try {
+        const [rows] = await pool.query(
+            "SELECT id, username, profile_pic, role FROM users WHERE LOWER(email) = ?",
+            [email]
+        );
+        let user;
+
+        if (rows.length > 0) {
+            user = rows[0];
+            if (user.role !== 'delivery') {
+                return res.status(409).json({
+                    success: false,
+                    message: "This email is already registered for another account type."
+                });
+            }
+        } else {
+            const name = String(profile.name || email.split('@')[0])
+                .replace(/[^a-zA-Z0-9_.-]/g, '')
+                .slice(0, 220) || 'agent';
+            const username = `${name}_${crypto.randomBytes(5).toString('hex')}`;
+            const password = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+            const profilePic = typeof profile.picture === 'string' ? profile.picture : null;
+            const [result] = await pool.query(
+                `INSERT INTO users (username, password, email, full_name, profile_pic, role)
+                 VALUES (?, ?, ?, ?, ?, 'delivery')`,
+                [username, password, email, profile.name || null, profilePic]
+            );
+            user = { id: result.insertId, username, profile_pic: profilePic, role: 'delivery' };
+        }
+
+        return res.json({
+            success: true,
+            message: "Agent authentication successful.",
+            token: createAuthToken(user, 'delivery'),
+            userId: user.id,
+            username: user.username,
+            profile_pic: user.profile_pic,
+            role: 'delivery'
+        });
+    } catch (err) {
+        console.error("Google agent registration failed:", err);
+        return res.status(500).json({ success: false, message: "Unable to complete Google agent registration." });
     }
 });
 
@@ -849,87 +1111,115 @@ app.post("/api/orders", authenticateToken, async (req, res) => {
         await connection.beginTransaction();
 
         const { userId, totalAmount, cartItems, addressId, paymentMethod, schedule, deliveryCharge, prescriptionId } = req.body;
+        const invalidOrder = (message, status = 400) => Object.assign(new Error(message), { status });
 
         if (!userId || !Array.isArray(cartItems) || cartItems.length === 0) {
-            return res.status(400).json({ success: false, message: "Invalid order data" });
+            throw invalidOrder("Invalid order data");
         }
 
         if (String(req.user.id) !== String(userId) && req.user.role !== 'admin') {
-            return res.status(403).json({ success: false, message: "Unauthorized order placement." });
+            throw invalidOrder("Unauthorized order placement.", 403);
         }
 
         const [addressRow] = await connection.query("SELECT id FROM addresses WHERE id = ? AND user_id = ?", [addressId, userId]);
         if (!addressId || addressRow.length === 0) {
-            return res.status(400).json({ success: false, message: "Please select a valid delivery address." });
+            throw invalidOrder("Please select a valid delivery address.");
         }
 
-        const productIds = [...new Set(cartItems.map(item => Number(item.id)).filter(Boolean))];
+        const itemQuantities = new Map();
+        for (const item of cartItems) {
+            const productId = Number(item && item.id);
+            const quantity = Number(item && item.quantity);
+            if (!Number.isSafeInteger(productId) || productId <= 0 ||
+                !Number.isSafeInteger(quantity) || quantity <= 0) {
+                throw invalidOrder("Cart contains an invalid product or quantity.");
+            }
+            itemQuantities.set(productId, (itemQuantities.get(productId) || 0) + quantity);
+        }
+
+        const productIds = [...itemQuantities.keys()].sort((a, b) => a - b);
         if (productIds.length === 0) {
-            return res.status(400).json({ success: false, message: "Cart is empty or invalid." });
+            throw invalidOrder("Cart is empty or invalid.");
         }
 
         const productPlaceholders = productIds.map(() => '?').join(',');
-        const [products] = await connection.query(`SELECT * FROM products WHERE id IN (${productPlaceholders})`, productIds);
+        const [products] = await connection.query(
+            `SELECT * FROM products WHERE id IN (${productPlaceholders}) ORDER BY id FOR UPDATE`,
+            productIds
+        );
         const productMap = new Map(products.map(product => [product.id, product]));
 
-        let subtotal = 0;
-        for (const item of cartItems) {
-            const product = productMap.get(Number(item.id));
+        let subtotalCents = 0;
+        for (const [productId, quantity] of itemQuantities) {
+            const product = productMap.get(productId);
             if (!product) {
-                return res.status(400).json({ success: false, message: `Medicine not found: ${item.name || item.id}` });
+                throw invalidOrder(`Medicine not found: ${productId}`);
             }
-            if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
-                return res.status(400).json({ success: false, message: `Invalid quantity for ${product.name}.` });
-            }
-            if (Number(product.stock) < Number(item.quantity)) {
-                return res.status(400).json({ success: false, message: `Only ${product.stock} units available for ${product.name}.` });
+            if (Number(product.stock) < quantity) {
+                throw invalidOrder(`Only ${product.stock} units available for ${product.name}.`);
             }
             if (Boolean(product.prescription_required) && !prescriptionId) {
-                return res.status(400).json({ success: false, message: `${product.name} requires a prescription before checkout.` });
+                throw invalidOrder(`${product.name} requires a prescription before checkout.`);
             }
             if (Boolean(product.prescription_required) && prescriptionId) {
                 const [prescriptionRow] = await connection.query("SELECT id FROM prescriptions WHERE id = ? AND user_id = ?", [prescriptionId, userId]);
                 if (prescriptionRow.length === 0) {
-                    return res.status(400).json({ success: false, message: "Selected prescription is invalid or does not belong to this user." });
+                    throw invalidOrder("Selected prescription is invalid or does not belong to this user.");
                 }
             }
-            const unitPrice = Number(product.price || 0);
-            const itemTotal = unitPrice * Number(item.quantity);
-            subtotal += itemTotal;
+            const unitPriceCents = Math.round(Number(product.price) * 100);
+            if (!Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0) {
+                throw new Error(`Invalid stored price for product ${productId}.`);
+            }
+            subtotalCents += unitPriceCents * quantity;
         }
 
-        const safeDeliveryCharge = Number(deliveryCharge || 0);
-        const computedTotal = Number(subtotal) + safeDeliveryCharge;
-        const requestedTotal = Number(totalAmount || 0);
+        const requestedDeliveryCharge = Number(deliveryCharge ?? 0);
+        const requestedTotal = Number(totalAmount);
+        if (!Number.isFinite(requestedDeliveryCharge) || requestedDeliveryCharge < 0 ||
+            !Number.isFinite(requestedTotal) || requestedTotal < 0) {
+            throw invalidOrder("Invalid delivery charge or order total.");
+        }
+        const deliveryChargeCents = Math.round(requestedDeliveryCharge * 100);
+        const computedTotalCents = subtotalCents + deliveryChargeCents;
 
-        if (Math.abs(requestedTotal - computedTotal) > 0.01) {
-            return res.status(400).json({ success: false, message: "Order total does not match the cart value. Please refresh and try again." });
+        if (Math.abs(Math.round(requestedTotal * 100) - computedTotalCents) > 1) {
+            throw invalidOrder("Order total does not match the cart value. Please refresh and try again.");
         }
 
         const orderNumber = `PW${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
         const payMethod = (paymentMethod || 'COD').toString();
-        const paymentStatus = ["UPI", "Card", "Online", "Stripe"].includes(payMethod) ? 'Paid' : 'Pending';
+        const paymentStatus = 'Pending';
         const orderQuery = `INSERT INTO orders (user_id, order_number, subtotal, delivery_charge, total_amount, status, payment_method, payment_status, address_id, prescription_id, schedule) VALUES (?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?)`;
         const orderSchedule = schedule || 'ASAP';
-        const [orderResult] = await connection.query(orderQuery, [userId, orderNumber, subtotal.toFixed(2), safeDeliveryCharge.toFixed(2), computedTotal.toFixed(2), payMethod, paymentStatus, addressId || null, prescriptionId || null, orderSchedule]);
+        const [orderResult] = await connection.query(orderQuery, [
+            userId,
+            orderNumber,
+            (subtotalCents / 100).toFixed(2),
+            (deliveryChargeCents / 100).toFixed(2),
+            (computedTotalCents / 100).toFixed(2),
+            payMethod,
+            paymentStatus,
+            addressId || null,
+            prescriptionId || null,
+            orderSchedule
+        ]);
         const orderId = orderResult.insertId;
 
-        const orderItemsValues = cartItems.map(item => {
-            const product = productMap.get(Number(item.id));
-            return [orderId, item.id, Number(item.quantity), Number(product.price || item.price || 0)];
+        const orderItemsValues = [...itemQuantities].map(([productId, quantity]) => {
+            const product = productMap.get(productId);
+            return [orderId, productId, quantity, product.price];
         });
         const orderItemsQuery = `INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ?`;
         await connection.query(orderItemsQuery, [orderItemsValues]);
 
-        const transactionReference = paymentStatus === 'Paid' ? `TXN-${Date.now()}-${orderId}` : null;
         await connection.query(
             "INSERT INTO payments (user_id, order_id, amount, payment_method, payment_status, transaction_reference) VALUES (?, ?, ?, ?, ?, ?)",
-            [userId, orderId, computedTotal.toFixed(2), payMethod, paymentStatus, transactionReference]
+            [userId, orderId, (computedTotalCents / 100).toFixed(2), payMethod, paymentStatus, null]
         );
 
-        for (const item of cartItems) {
-            const product = productMap.get(Number(item.id));
-            const qty = Number(item.quantity);
+        for (const [productId, qty] of itemQuantities) {
+            const product = productMap.get(productId);
             const [updateResult] = await connection.query(
                 "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?",
                 [qty, product.id, qty]
@@ -940,12 +1230,15 @@ app.post("/api/orders", authenticateToken, async (req, res) => {
         }
 
         await connection.commit();
-        io.emit('new_order_pool');
+        io.to('delivery:pool').emit('new_order_pool');
         res.json({ success: true, message: "Order placed successfully! Preparing Delivery.", orderId, orderNumber, assignedAgent: null });
     } catch (err) {
         await connection.rollback();
         console.error("Order process failed:", err);
-        res.status(500).json({ success: false, message: err.message || "Server error processing order" });
+        res.status(err.status || 500).json({
+            success: false,
+            message: err.status ? err.message : "Server error processing order"
+        });
     } finally {
         connection.release();
     }
@@ -972,7 +1265,35 @@ app.get("/api/orders/user/:id", authenticateToken, async (req, res) => {
             ORDER BY o.created_at DESC
         `;
         const [rows] = await pool.query(query, [userId]);
-        res.json({ success: true, orders: rows });
+        const [[[orderStats]], [[paymentStats]]] = await Promise.all([
+            pool.query(`
+                SELECT COUNT(*) AS total_orders,
+                       SUM(CASE WHEN LOWER(status) = 'delivered' THEN 1 ELSE 0 END) AS delivered_orders,
+                       SUM(CASE WHEN LOWER(status) IN ('pending', 'confirmed', 'processing', 'assigned', 'accepted', 'picked up', 'out for delivery') THEN 1 ELSE 0 END) AS pending_orders,
+                       SUM(CASE WHEN LOWER(status) = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,
+                       COALESCE(SUM(CASE
+                           WHEN LOWER(payment_status) IN ('paid', 'succeeded', 'completed')
+                            AND LOWER(status) <> 'cancelled'
+                           THEN total_amount ELSE 0 END), 0) AS total_spent,
+                       MAX(created_at) AS last_order_date
+                FROM orders
+                WHERE user_id = ?
+            `, [userId]),
+            pool.query("SELECT COUNT(*) AS total_payment_transactions FROM payments WHERE user_id = ?", [userId])
+        ]);
+        res.json({
+            success: true,
+            orders: rows,
+            stats: {
+                total_orders: Number(orderStats.total_orders || 0),
+                delivered_orders: Number(orderStats.delivered_orders || 0),
+                pending_orders: Number(orderStats.pending_orders || 0),
+                cancelled_orders: Number(orderStats.cancelled_orders || 0),
+                total_spent: Number(orderStats.total_spent || 0),
+                total_payment_transactions: Number(paymentStats.total_payment_transactions || 0),
+                last_order_date: orderStats.last_order_date
+            }
+        });
     } catch (err) {
         console.error("Fetch orders failed:", err);
         res.status(500).send({ message: "Server error fetching orders" });
@@ -1049,15 +1370,20 @@ app.get("/api/agent/profile/:id", authenticateToken, async (req, res) => {
 app.post("/api/agent/profile/:id", authenticateToken, async (req, res) => {
     try {
         const userId = req.params.id;
-        if (req.user.id != userId) return res.status(403).json({ success: false, message: "Unauthorized" });
-        const { username, phone, vehicle_type, vehicle_number, availability } = req.body;
+        if (req.user.role !== 'delivery' || String(req.user.id) !== String(userId)) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        const { username, phone, vehicle_type, vehicle_number, availability } = req.body || {};
+        if (availability !== 'Online' && availability !== 'Offline') {
+            return res.status(400).json({ success: false, message: "Availability must be Online or Offline." });
+        }
 
         const query = `
             UPDATE users 
             SET username = ?, contact = ?, vehicle_type = ?, vehicle_number = ?, availability = ?
             WHERE id = ?
         `;
-        await pool.query(query, [username, phone, vehicle_type, vehicle_number, availability || 'Online', userId]);
+        await pool.query(query, [username, phone, vehicle_type, vehicle_number, availability, userId]);
 
         res.json({ success: true, message: "Profile updated successfully!" });
     } catch (err) {
@@ -1126,7 +1452,7 @@ app.get("/api/user/:id/profile", authenticateToken, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Unauthorized' });
         }
         const [rows] = await pool.query(
-            "SELECT id, username, email, contact, full_name, profile_pic, role, email_notifications, sms_alerts FROM users WHERE id = ?",
+            "SELECT id, username, email, contact, full_name, profile_pic, role, email_notifications, sms_alerts, membership_id, created_at FROM users WHERE id = ?",
             [userId]
         );
         if (rows.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
@@ -1195,57 +1521,21 @@ app.post("/api/user/:id/addresses", authenticateToken, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Unauthorized' });
         }
 
-        const body = req.body || {};
-        console.log('DEBUG_ADDRESS_BODY', JSON.stringify(body));
-        const payload = {
-            full_name: sanitizeText(body.full_name || body.name || ''),
-            mobile: normalizePhone(body.mobile || body.contact || ''),
-            house_number: sanitizeText(body.house_number || body.flat_number || ''),
-            street: sanitizeText(body.street || body.area || ''),
-            city: sanitizeText(body.city || ''),
-            state: sanitizeText(body.state || ''),
-            pincode: sanitizeText(body.pincode || ''),
-            landmark: sanitizeText(body.landmark || ''),
-            title: sanitizeText(body.title || body.label || 'Home'),
-            label: sanitizeText(body.label || body.title || 'Home'),
-            full_address: sanitizeText(body.full_address || body.fullAddress || ''),
-            is_default: Boolean(body.is_default),
-            latitude: body.latitude || null,
-            longitude: body.longitude || null
-        };
-
-        if (!payload.full_name) {
-            const [userRow] = await pool.query('SELECT username, contact FROM users WHERE id = ?', [userId]);
-            payload.full_name = sanitizeText(userRow[0]?.username || 'Customer');
-        }
-        if (!payload.mobile) {
-            const [userRow] = await pool.query('SELECT contact FROM users WHERE id = ?', [userId]);
-            payload.mobile = normalizePhone(userRow[0]?.contact || '');
-        }
-        if (!payload.mobile && payload.full_address) {
-            payload.mobile = '0000000000';
-        }
-
+        const payload = normalizeAddressPayload(req.body || {});
+        const [userRows] = await pool.query("SELECT username, contact FROM users WHERE id = ?", [userId]);
+        if (userRows.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+        if (!payload.full_name) payload.full_name = sanitizeText(userRows[0].username || '');
+        if (!payload.mobile) payload.mobile = normalizePhone(userRows[0].contact || '');
         const validationErrors = validateAddressPayload(payload);
         if (validationErrors.length) {
             return res.status(400).json({ success: false, message: validationErrors[0] });
         }
 
-        const fullAddress = payload.full_address || buildAddressString(payload);
-
-        if (payload.is_default) {
-            await pool.query('UPDATE addresses SET is_default = FALSE WHERE user_id = ?', [userId]);
-        }
-
-        const [result] = await pool.query(
-            "INSERT INTO addresses (user_id, full_name, mobile, house_number, street, city, state, pincode, landmark, label, full_address, latitude, longitude, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [userId, payload.full_name, payload.mobile, payload.house_number, payload.street, payload.city, payload.state, payload.pincode, payload.landmark, payload.label || payload.title || 'Home', fullAddress, payload.latitude, payload.longitude, payload.is_default ? 1 : 0]
-        );
-
-        res.json({ success: true, message: 'Address saved successfully!', addressId: result.insertId });
+        const addressId = await persistAddress(userId, payload);
+        res.json({ success: true, message: 'Address saved successfully!', addressId });
     } catch (err) {
         console.error('Address save failed:', err);
-        res.status(500).json({ success: false, message: 'Server error saving address.' });
+        res.status(err.status || 500).json({ success: false, message: err.status ? err.message : 'Server error saving address.' });
     }
 });
 
@@ -1257,70 +1547,99 @@ app.put("/api/user/:id/addresses/:addressId", authenticateToken, async (req, res
             return res.status(403).json({ success: false, message: 'Unauthorized' });
         }
 
-        const body = req.body || {};
-        const payload = {
-            full_name: sanitizeText(body.full_name || body.name || ''),
-            mobile: normalizePhone(body.mobile || body.contact || ''),
-            house_number: sanitizeText(body.house_number || body.flat_number || ''),
-            street: sanitizeText(body.street || body.area || ''),
-            city: sanitizeText(body.city || ''),
-            state: sanitizeText(body.state || ''),
-            pincode: sanitizeText(body.pincode || ''),
-            landmark: sanitizeText(body.landmark || ''),
-            title: sanitizeText(body.title || body.label || 'Home'),
-            label: sanitizeText(body.label || body.title || 'Home'),
-            full_address: sanitizeText(body.full_address || body.fullAddress || ''),
-            is_default: Boolean(body.is_default),
-            latitude: body.latitude || null,
-            longitude: body.longitude || null
-        };
-
-        if (!payload.full_name) {
-            const [userRow] = await pool.query('SELECT username, contact FROM users WHERE id = ?', [userId]);
-            payload.full_name = sanitizeText(userRow[0]?.username || 'Customer');
-        }
-        if (!payload.mobile) {
-            const [userRow] = await pool.query('SELECT contact FROM users WHERE id = ?', [userId]);
-            payload.mobile = normalizePhone(userRow[0]?.contact || '');
-        }
-        if (!payload.mobile && payload.full_address) {
-            payload.mobile = '0000000000';
-        }
-
+        const payload = normalizeAddressPayload(req.body || {});
+        const [userRows] = await pool.query("SELECT username, contact FROM users WHERE id = ?", [userId]);
+        if (userRows.length === 0) return res.status(404).json({ success: false, message: 'User not found.' });
+        if (!payload.full_name) payload.full_name = sanitizeText(userRows[0].username || '');
+        if (!payload.mobile) payload.mobile = normalizePhone(userRows[0].contact || '');
         const validationErrors = validateAddressPayload(payload);
         if (validationErrors.length) {
             return res.status(400).json({ success: false, message: validationErrors[0] });
         }
 
-        if (payload.is_default) {
-            await pool.query('UPDATE addresses SET is_default = FALSE WHERE user_id = ?', [userId]);
-        }
-
-        const fullAddress = payload.full_address || buildAddressString(payload);
-        await pool.query(
-            "UPDATE addresses SET full_name = ?, mobile = ?, house_number = ?, street = ?, city = ?, state = ?, pincode = ?, landmark = ?, label = ?, full_address = ?, latitude = ?, longitude = ?, is_default = ? WHERE id = ? AND user_id = ?",
-            [payload.full_name, payload.mobile, payload.house_number, payload.street, payload.city, payload.state, payload.pincode, payload.landmark, payload.label || payload.title || 'Home', fullAddress, payload.latitude, payload.longitude, payload.is_default ? 1 : 0, addressId, userId]
-        );
+        await persistAddress(userId, payload, addressId);
         res.json({ success: true, message: 'Address updated successfully!' });
     } catch (err) {
         console.error('Update address failed:', err);
-        res.status(500).json({ success: false, message: 'Server error updating address.' });
+        res.status(err.status || 500).json({ success: false, message: err.status ? err.message : 'Server error updating address.' });
     }
 });
 
 // DELETE USER ADDRESS
 app.delete("/api/user/:id/addresses/:addressId", authenticateToken, async (req, res) => {
+    let connection;
+    let transactionStarted = false;
     try {
         const { id, addressId } = req.params;
-        if (req.user.id != id && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Unauthorized" });
-        const [result] = await pool.query("DELETE FROM addresses WHERE id = ? AND user_id = ?", [addressId, id]);
-        if (result.affectedRows === 0) {
+        if (String(req.user.id) !== String(id) && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+        transactionStarted = true;
+        const [users] = await connection.query("SELECT id FROM users WHERE id = ? FOR UPDATE", [id]);
+        if (users.length === 0) {
+            await connection.rollback();
+            transactionStarted = false;
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
+        const [addresses] = await connection.query(
+            "SELECT id, is_default FROM addresses WHERE id = ? AND user_id = ? FOR UPDATE",
+            [addressId, id]
+        );
+        if (addresses.length === 0) {
+            await connection.rollback();
+            transactionStarted = false;
             return res.status(404).json({ success: false, message: 'Address not found.' });
         }
+
+        const [orders] = await connection.query(
+            "SELECT id FROM orders WHERE address_id = ? LIMIT 1",
+            [addressId]
+        );
+        if (orders.length > 0) {
+            await connection.rollback();
+            transactionStarted = false;
+            return res.status(409).json({ success: false, message: 'This address is used by an order and cannot be deleted.' });
+        }
+
+        await connection.query("DELETE FROM addresses WHERE id = ? AND user_id = ?", [addressId, id]);
+        if (addresses[0].is_default) {
+            const [nextAddress] = await connection.query(
+                "SELECT id FROM addresses WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+                [id]
+            );
+            if (nextAddress.length > 0) {
+                await connection.query(
+                    "UPDATE addresses SET is_default = CASE WHEN id = ? THEN TRUE ELSE FALSE END WHERE user_id = ?",
+                    [nextAddress[0].id, id]
+                );
+            }
+        }
+
+        await connection.commit();
+        transactionStarted = false;
         res.json({ success: true, message: "Address deleted successfully!" });
     } catch (err) {
+        if (connection && transactionStarted) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error("Address delete rollback failed:", rollbackError);
+            }
+        }
         console.error("Delete address failed:", err);
-        res.status(500).send({ message: "Server error deleting address." });
+        const status = err.code === 'ER_ROW_IS_REFERENCED_2' ? 409 : 500;
+        res.status(status).json({
+            success: false,
+            message: status === 409
+                ? 'This address is used by an order and cannot be deleted.'
+                : 'Server error deleting address.'
+        });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
@@ -1415,19 +1734,26 @@ app.get("/api/admin/stats", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
         const [users] = await pool.query("SELECT COUNT(*) as total FROM users WHERE role = 'user'");
-        const [currentOrders] = await pool.query("SELECT COUNT(*) as total FROM orders WHERE status NOT IN ('Delivered', 'Cancelled')");
-        const [deliveredOrders] = await pool.query("SELECT COUNT(*) as total FROM orders WHERE status = 'Delivered'");
-        const [revenue] = await pool.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status IN ('Delivered', 'Completed')");
+        const [orderStats] = await pool.query(`
+            SELECT COUNT(*) AS total_orders,
+                   SUM(CASE WHEN LOWER(COALESCE(status, '')) IN ('delivered', 'completed') THEN 1 ELSE 0 END) AS delivered_orders,
+                   SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('delivered', 'completed', 'cancelled') THEN 1 ELSE 0 END) AS current_orders,
+                   COALESCE(SUM(CASE
+                       WHEN LOWER(payment_status) IN ('paid', 'succeeded', 'completed')
+                        AND LOWER(COALESCE(status, '')) <> 'cancelled'
+                       THEN total_amount ELSE 0 END), 0) AS total_revenue
+            FROM orders
+        `);
         const [inventory] = await pool.query("SELECT COUNT(*) as low_stock FROM products WHERE stock <= min_stock OR stock < 20");
 
         res.json({
             success: true,
             stats: {
                 totalUsers: users[0].total || 0,
-                currentOrders: currentOrders[0].total || 0,
-                deliveredOrders: deliveredOrders[0].total || 0,
-                totalOrders: Number(currentOrders[0].total || 0) + Number(deliveredOrders[0].total || 0),
-                totalRevenue: Number(revenue[0].total || 0),
+                currentOrders: Number(orderStats[0].current_orders || 0),
+                deliveredOrders: Number(orderStats[0].delivered_orders || 0),
+                totalOrders: Number(orderStats[0].total_orders || 0),
+                totalRevenue: Number(orderStats[0].total_revenue || 0),
                 lowStockItems: inventory[0].low_stock || 0
             }
         });
@@ -1444,7 +1770,10 @@ app.get("/api/admin/users", authenticateToken, async (req, res) => {
         const [rows] = await pool.query(`
             SELECT u.id, u.username, u.email, u.contact, u.full_name, u.role, u.created_at, 
                    COUNT(DISTINCT o.id) AS order_count,
-                   COALESCE(SUM(o.total_amount), 0) AS total_spent
+                   COALESCE(SUM(CASE
+                       WHEN LOWER(o.payment_status) IN ('paid', 'succeeded', 'completed')
+                        AND LOWER(COALESCE(o.status, '')) <> 'cancelled'
+                       THEN o.total_amount ELSE 0 END), 0) AS total_spent
             FROM users u
             LEFT JOIN orders o ON o.user_id = u.id
             WHERE u.role = 'user' OR u.role = 'delivery'
@@ -1578,21 +1907,39 @@ app.get("/api/admin/orders/:id", authenticateToken, async (req, res) => {
 app.post("/api/admin/orders/:id/assign", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
-        const { agentId } = req.body;
-        const orderId = req.params.id;
+        const agentId = Number(req.body && req.body.agentId);
+        const orderId = Number(req.params.id);
 
-        if (!agentId) return res.status(400).json({ success: false, message: "Agent ID required" });
+        if (!Number.isSafeInteger(agentId) || agentId <= 0 ||
+            !Number.isSafeInteger(orderId) || orderId <= 0) {
+            return res.status(400).json({ success: false, message: "Valid order and agent IDs are required." });
+        }
 
-        await pool.query("UPDATE orders SET agent_id = ?, status = 'Ready for Delivery' WHERE id = ?", [agentId, orderId]);
+        const [agents] = await pool.query("SELECT id FROM users WHERE id = ? AND role = 'delivery'", [agentId]);
+        if (agents.length === 0) {
+            return res.status(404).json({ success: false, message: "Delivery agent not found." });
+        }
+
+        const [result] = await pool.query(
+            `UPDATE orders SET agent_id = ?, status = 'Ready for Delivery'
+             WHERE id = ? AND agent_id IS NULL AND LOWER(status) = 'ready for delivery'`,
+            [agentId, orderId]
+        );
+        if (result.affectedRows === 0) {
+            const [orders] = await pool.query("SELECT id FROM orders WHERE id = ?", [orderId]);
+            return res.status(orders.length === 0 ? 404 : 409).json({
+                success: false,
+                message: orders.length === 0 ? "Order not found." : "Order is not available for assignment."
+            });
+        }
 
         // Get user_id of the order to notify them
         const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [orderId]);
         if (rows.length > 0) {
-            io.emit(`order_update_${rows[0].user_id}`, { orderId, status: 'Agent Assigned' });
+            io.to(`user:${rows[0].user_id}`).emit('order_update', { orderId, status: 'Ready for Delivery', agentAssigned: true });
         }
-        
-        // Notify the specific agent
-        io.emit('new_delivery', { agentId, orderId });
+        io.to(`delivery:${agentId}`).emit('new_delivery', { agentId, orderId });
+        io.to('delivery:pool').emit('new_order_pool');
 
         res.json({ success: true, message: "Agent assigned successfully!" });
     } catch (err) {
@@ -1604,17 +1951,31 @@ app.post("/api/admin/orders/:id/assign", authenticateToken, async (req, res) => 
 app.put("/api/admin/orders/:id/status", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
-        const { status } = req.body;
-        const orderId = req.params.id;
-        
-        await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, orderId]);
+        const status = req.body && req.body.status;
+        const orderId = Number(req.params.id);
+        if (!Number.isSafeInteger(orderId) || orderId <= 0 || status !== 'Cancelled') {
+            return res.status(400).json({ success: false, message: "Invalid order status update." });
+        }
+        const [result] = await pool.query(
+            `UPDATE orders SET status = 'Cancelled'
+             WHERE id = ? AND LOWER(status) NOT IN ('delivered', 'cancelled')`,
+            [orderId]
+        );
+        if (result.affectedRows === 0) {
+            const [orders] = await pool.query("SELECT status FROM orders WHERE id = ?", [orderId]);
+            return res.status(orders.length === 0 ? 404 : 409).json({
+                success: false,
+                message: orders.length === 0 ? "Order not found." : "A completed or cancelled order cannot be cancelled."
+            });
+        }
         
         const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [orderId]);
         if (rows.length > 0) {
-            io.emit(`order_update_${rows[0].user_id}`, { orderId, status });
+            io.to(`user:${rows[0].user_id}`).emit('order_update', { orderId, status: 'Cancelled' });
         }
+        io.to('delivery:pool').emit('new_order_pool');
         
-        res.json({ success: true, message: `Order status updated to ${status}` });
+        res.json({ success: true, message: "Order cancelled successfully." });
     } catch (err) {
         console.error("Update order status failed:", err);
         res.status(500).send({ message: "Server error updating order status" });
@@ -1672,6 +2033,18 @@ app.delete("/api/admin/products/:id", authenticateToken, async (req, res) => {
     } catch (err) {
         console.error("Delete product failed:", err);
         res.status(500).send({ message: "Cannot delete product (may have existing orders)." });
+    }
+});
+
+app.get("/api/pharmacies", async (req, res) => {
+    try {
+        const [pharmacies] = await pool.query(
+            "SELECT id, name, location, contact FROM pharmacies WHERE LOWER(status) = 'active' ORDER BY name"
+        );
+        res.json({ success: true, pharmacies });
+    } catch (err) {
+        console.error("Fetch public pharmacy locations failed:", err);
+        res.status(500).json({ success: false, message: "Server error fetching pharmacy locations." });
     }
 });
 
@@ -1743,9 +2116,36 @@ app.get("/api/pharmacy/orders", authenticateToken, async (req, res) => {
 app.put("/api/pharmacy/orders/:id/status", authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'pharmacy' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Pharmacy access required" });
-        const { status } = req.body; // e.g. "Preparing", "Ready for Delivery", "Rejected"
-        if (!status) return res.status(400).json({ success: false, message: "Status required" });
-        await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, req.params.id]);
+        const status = req.body && req.body.status;
+        const orderId = Number(req.params.id);
+        const previousStatuses = {
+            Preparing: ['pending', 'preparing'],
+            'Ready for Delivery': ['pending', 'preparing', 'ready for delivery']
+        };
+        if (!Number.isSafeInteger(orderId) || orderId <= 0 ||
+            !Object.prototype.hasOwnProperty.call(previousStatuses, status)) {
+            return res.status(400).json({ success: false, message: "Invalid order status update." });
+        }
+        const [result] = await pool.query(
+            `UPDATE orders SET status = ?
+             WHERE id = ? AND LOWER(status) IN (${previousStatuses[status].map(() => '?').join(', ')})`,
+            [status, orderId, ...previousStatuses[status]]
+        );
+        if (result.affectedRows === 0) {
+            const [orders] = await pool.query("SELECT status FROM orders WHERE id = ?", [orderId]);
+            if (orders.length > 0 && String(orders[0].status).toLowerCase() === status.toLowerCase()) {
+                return res.json({ success: true, message: "Order status is already " + status });
+            }
+            return res.status(orders.length === 0 ? 404 : 409).json({
+                success: false,
+                message: orders.length === 0 ? "Order not found." : "Order is no longer in a pharmacy-updatable state."
+            });
+        }
+        const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [orderId]);
+        if (rows.length > 0) {
+            io.to(`user:${rows[0].user_id}`).emit('order_update', { orderId, status });
+        }
+        if (status === 'Ready for Delivery') io.to('delivery:pool').emit('new_order_pool');
         res.json({ success: true, message: "Order status updated to " + status });
     } catch (err) {
         console.error("Pharmacy order status update failed:", err);
@@ -1815,16 +2215,19 @@ app.put("/api/pharmacy/prescriptions/:id/status", authenticateToken, async (req,
 // Pool of unassigned orders — Includes fallback
 app.get("/api/delivery/pool", authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'delivery' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Delivery access required" });
+        if (req.user.role !== 'delivery') return res.status(403).json({ success: false, message: "Delivery access required" });
         const [orders] = await pool.query(`
-            SELECT o.id, o.total_amount, o.status, o.payment_method, u.username as customer_name, u.contact as customer_phone, a.full_address 
+            SELECT o.id, o.total_amount, o.status, o.payment_method, o.payment_status, o.prescription_id,
+                   p.status AS prescription_status, u.username as customer_name, u.contact as customer_phone,
+                   a.full_address, a.latitude AS delivery_latitude, a.longitude AS delivery_longitude
             FROM orders o 
             LEFT JOIN users u ON o.user_id = u.id 
             LEFT JOIN addresses a ON o.address_id = a.id
-            WHERE o.agent_id IS NULL AND (o.status = 'Ready for Delivery' OR o.status = 'Pending' OR o.status = 'Preparing')
+            LEFT JOIN prescriptions p ON o.prescription_id = p.id
+            WHERE o.agent_id IS NULL AND LOWER(o.status) = 'ready for delivery'
             ORDER BY o.created_at ASC
         `);
-        res.json({ success: true, orders: orders });
+        res.json({ success: true, orders });
     } catch (err) {
         console.error("Fetch pool orders failed:", err.message);
         res.status(500).json({ success: false, message: "Server error fetching delivery orders." });
@@ -1834,22 +2237,42 @@ app.get("/api/delivery/pool", authenticateToken, async (req, res) => {
 // Accept order from pool
 app.post("/api/delivery/accept/:id", authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'delivery' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Delivery access required" });
-        
+        if (req.user.role !== 'delivery') return res.status(403).json({ success: false, message: "Delivery access required" });
+        const orderId = Number(req.params.id);
+        if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+            return res.status(400).json({ success: false, message: "Valid order ID required." });
+        }
+        const [agents] = await pool.query(
+            "SELECT id FROM users WHERE id = ? AND role = 'delivery' AND availability = 'Online'",
+            [req.user.id]
+        );
+        if (agents.length === 0) {
+            return res.status(409).json({ success: false, message: "Set your availability to Online before accepting an order." });
+        }
+
         const [result] = await pool.query(
-            "UPDATE orders SET agent_id = ?, status = 'Ready for Delivery' WHERE id = ? AND agent_id IS NULL", 
-            [req.user.id, req.params.id]
+            `UPDATE orders SET agent_id = ?
+             WHERE id = ? AND agent_id IS NULL AND LOWER(status) = 'ready for delivery'
+               AND EXISTS (
+                   SELECT 1 FROM users u
+                   WHERE u.id = ? AND u.role = 'delivery' AND u.availability = 'Online'
+               )`,
+            [req.user.id, orderId, req.user.id]
         );
         
         if (result.affectedRows === 0) {
-            return res.status(400).json({ success: false, message: "Order already taken or invalid." });
+            const [orders] = await pool.query("SELECT id FROM orders WHERE id = ?", [orderId]);
+            if (orders.length === 0) {
+                return res.status(404).json({ success: false, message: "Order not found." });
+            }
+            return res.status(409).json({ success: false, message: "Order is no longer available." });
         }
         
-        const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [req.params.id]);
+        const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [orderId]);
         if (rows.length > 0) {
-           io.emit(`order_update_${rows[0].user_id}`, { orderId: req.params.id, status: 'Agent Assigned' });
+           io.to(`user:${rows[0].user_id}`).emit('order_update', { orderId, status: 'Ready for Delivery', agentAssigned: true });
         }
-        io.emit('new_order_pool');
+        io.to('delivery:pool').emit('new_order_pool');
         res.json({ success: true, message: "Order accepted successfully!" });
     } catch (err) {
         console.error("Accept order failed:", err);
@@ -1860,13 +2283,16 @@ app.post("/api/delivery/accept/:id", authenticateToken, async (req, res) => {
 // Get Orders Assigned to Delivery Agent
 app.get("/api/delivery/assigned", authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'delivery' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Delivery access required" });
+        if (req.user.role !== 'delivery') return res.status(403).json({ success: false, message: "Delivery access required" });
         const [orders] = await pool.query(`
-            SELECT o.id, o.total_amount, o.status, o.payment_method, u.username as customer_name, u.contact as customer_phone, a.full_address 
+            SELECT o.id, o.total_amount, o.status, o.payment_method, o.payment_status, o.prescription_id,
+                   p.status AS prescription_status, u.username as customer_name, u.contact as customer_phone,
+                   a.full_address, a.latitude AS delivery_latitude, a.longitude AS delivery_longitude
             FROM orders o 
             LEFT JOIN users u ON o.user_id = u.id 
             LEFT JOIN addresses a ON o.address_id = a.id
-            WHERE o.agent_id = ? AND o.status NOT IN ('Delivered', 'Review', 'Rejected')
+            LEFT JOIN prescriptions p ON o.prescription_id = p.id
+            WHERE o.agent_id = ? AND LOWER(COALESCE(o.status, '')) NOT IN ('delivered', 'review', 'cancelled', 'rejected')
             ORDER BY o.created_at ASC
         `, [req.user.id]);
         res.json({ success: true, orders });
@@ -1879,23 +2305,84 @@ app.get("/api/delivery/assigned", authenticateToken, async (req, res) => {
 // Update Delivery Status (and emit socket)
 app.put("/api/delivery/order/:id/status", authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'delivery' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Delivery access required" });
-        const { status, lat, lng } = req.body; 
-        if (!status) return res.status(400).json({ success: false, message: "Status required" });
-        const [updateResult] = await pool.query("UPDATE orders SET status = ? WHERE id = ? AND agent_id = ?", [status, req.params.id, req.user.id]);
+        if (req.user.role !== 'delivery') return res.status(403).json({ success: false, message: "Delivery access required" });
+        const { status, lat, lng } = req.body || {};
+        const orderId = Number(req.params.id);
+        const previousStatus = status === 'Out for Delivery' ? 'Ready for Delivery' :
+            status === 'Delivered' ? 'Out for Delivery' : null;
+        if (!Number.isSafeInteger(orderId) || orderId <= 0 || !previousStatus) {
+            return res.status(400).json({ success: false, message: "Invalid delivery status update." });
+        }
+        const hasLatitude = lat !== undefined && lat !== null;
+        const hasLongitude = lng !== undefined && lng !== null;
+        if (hasLatitude !== hasLongitude) {
+            return res.status(400).json({ success: false, message: "Both location coordinates are required." });
+        }
+        const latitude = hasLatitude && typeof lat !== 'boolean' && String(lat).trim() !== '' ? Number(lat) : null;
+        const longitude = hasLongitude && typeof lng !== 'boolean' && String(lng).trim() !== '' ? Number(lng) : null;
+        if (hasLatitude && (latitude === null || !Number.isFinite(latitude) || Math.abs(latitude) > 90 ||
+            longitude === null || !Number.isFinite(longitude) || Math.abs(longitude) > 180)) {
+            return res.status(400).json({ success: false, message: "Invalid location coordinates." });
+        }
+
+        const [updateResult] = await pool.query(
+            `UPDATE orders SET status = ?, lat = COALESCE(?, lat), lng = COALESCE(?, lng)
+             WHERE id = ? AND agent_id = ? AND LOWER(status) = LOWER(?)`,
+            [status, latitude, longitude, orderId, req.user.id, previousStatus]
+        );
         if (updateResult.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: "Assigned delivery order not found." });
+            const [orders] = await pool.query("SELECT id FROM orders WHERE id = ? AND agent_id = ?", [orderId, req.user.id]);
+            return res.status(orders.length === 0 ? 404 : 409).json({
+                success: false,
+                message: orders.length === 0 ? "Assigned delivery order not found." : "Order status has changed. Refresh and try again."
+            });
         }
         
-        const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [req.params.id]);
+        const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [orderId]);
         if (rows.length > 0) {
-            io.emit(`order_update_${rows[0].user_id}`, { orderId: req.params.id, status, lat, lng });
+            io.to(`user:${rows[0].user_id}`).emit('order_update', { orderId, status, lat: latitude, lng: longitude });
         }
         
         res.json({ success: true, message: "Delivery status updated to " + status });
     } catch (err) {
         console.error("Update delivery status failed:", err);
         res.status(500).send({ message: "Server error updating delivery status." });
+    }
+});
+
+app.put("/api/delivery/order/:id/location", authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'delivery') return res.status(403).json({ success: false, message: "Delivery access required" });
+        const orderId = Number(req.params.id);
+        const lat = req.body && req.body.lat;
+        const lng = req.body && req.body.lng;
+        const latitude = lat !== null && lat !== undefined && typeof lat !== 'boolean' && String(lat).trim() !== ''
+            ? Number(lat) : NaN;
+        const longitude = lng !== null && lng !== undefined && typeof lng !== 'boolean' && String(lng).trim() !== ''
+            ? Number(lng) : NaN;
+        if (!Number.isSafeInteger(orderId) || orderId <= 0 ||
+            !Number.isFinite(latitude) || Math.abs(latitude) > 90 ||
+            !Number.isFinite(longitude) || Math.abs(longitude) > 180) {
+            return res.status(400).json({ success: false, message: "Valid order and location coordinates are required." });
+        }
+
+        const [result] = await pool.query(
+            `UPDATE orders SET lat = ?, lng = ?
+             WHERE id = ? AND agent_id = ? AND LOWER(status) = 'out for delivery'`,
+            [latitude, longitude, orderId, req.user.id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: "Active assigned delivery not found." });
+        }
+
+        const [rows] = await pool.query("SELECT user_id FROM orders WHERE id = ?", [orderId]);
+        if (rows.length > 0) {
+            io.to(`user:${rows[0].user_id}`).emit('order_update', { orderId, lat: latitude, lng: longitude });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Update delivery location failed:", err);
+        res.status(500).json({ success: false, message: "Server error updating delivery location." });
     }
 });
 
@@ -2014,13 +2501,16 @@ app.get("/api/user/:id/consultations", authenticateToken, async (req, res) => {
 // Get Agent Earnings (Sum of delivered orders delivery fee mock)
 app.get("/api/delivery/earnings", authenticateToken, async (req, res) => {
     try {
-        if (req.user.role !== 'delivery' && req.user.role !== 'admin') return res.status(403).json({ success: false, message: "Delivery access required" });
-        // Mocking ₹50 per delivered order assigned to this agent
-        const [rows] = await pool.query("SELECT COUNT(*) as count FROM orders WHERE agent_id = ? AND status = 'Delivered'", [req.user.id]);
-        const trips = rows[0].count;
-        res.json({ success: true, earnings: trips * 50, trips });
+        if (req.user.role !== 'delivery') return res.status(403).json({ success: false, message: "Delivery access required" });
+        const [rows] = await pool.query(
+            "SELECT COUNT(*) AS count FROM orders WHERE agent_id = ? AND LOWER(status) = 'delivered'",
+            [req.user.id]
+        );
+        const trips = Number(rows[0].count || 0);
+        res.json({ success: true, earningsConfigured: false, earnings: null, trips });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Error fetching earnings" });
+        console.error("Fetch delivery earnings failed:", err);
+        res.status(500).json({ success: false, message: "Error fetching delivery earnings." });
     }
 });
 
@@ -2028,49 +2518,35 @@ app.get("/api/delivery/earnings", authenticateToken, async (req, res) => {
 // ADVANCED FEATURES APIs (Phase 5)
 // ==========================================
 
-// Mock AI Medicine Recommendation (by symptom)
+// Catalog search only; this endpoint does not diagnose symptoms or recommend treatment.
 app.post("/api/ai/recommend", async (req, res) => {
     try {
-        const { symptom } = req.body;
-        if (!symptom) return res.status(400).json({ success: false, message: "Symptom required" });
-
-        const symptomLower = symptom.toLowerCase();
-        let targetCategory = null;
-
-        // Handle Greetings
-        if (symptomLower.match(/\b(hi|hello|hey|greetings|hola)\b/)) {
-            return res.json({
-                success: true,
-                message: "👋 Hello! I'm your PharmaWave AI Pharmacist. How can I help you today? Tell me your symptoms like 'I have a headache' or 'I feel weak'.",
-                products: []
-            });
+        const query = typeof (req.body && req.body.query) === 'string' ? req.body.query.trim() : '';
+        if (!query) return res.status(400).json({ success: false, message: "Enter a product name or category." });
+        if (query.length > 100) {
+            return res.status(400).json({ success: false, message: "Search text must be 100 characters or fewer." });
         }
 
-        // Logic for mapping symptoms to categories
-        if (symptomLower.includes('pain') || symptomLower.includes('headache') || symptomLower.includes('backache')) targetCategory = "Pain Relief";
-        else if (symptomLower.includes('fever') || symptomLower.includes('cold') || symptomLower.includes('flu') || symptomLower.includes('cough')) targetCategory = "Cold & Flu";
-        else if (symptomLower.includes('weak') || symptomLower.includes('vitamin') || symptomLower.includes('energy')) targetCategory = "Vitamins";
-        else if (symptomLower.includes('infection') || symptomLower.includes('bacteria')) targetCategory = "Antibiotics";
-        else if (symptomLower.includes('allergy') || symptomLower.includes('itch') || symptomLower.includes('sneeze')) targetCategory = "Allergy";
-        else if (symptomLower.includes('injury') || symptomLower.includes('cut') || symptomLower.includes('wound') || symptomLower.includes('kit') || symptomLower.includes('burn')) targetCategory = "First Aid";
-
-        if (targetCategory) {
-            const [recommendations] = await pool.query("SELECT * FROM products WHERE category = ? LIMIT 3", [targetCategory]);
-            res.json({
-                success: true,
-                message: `🤖 AI Diagnosis: I recommend products from our **${targetCategory}** category. Hope you feel better soon!`,
-                products: recommendations
-            });
-        } else {
-            res.json({
-                success: true,
-                message: "I'm not quite sure how to help with that specifically. Could you describe your symptoms more clearly? (E.g. fever, headache, allergy)",
-                products: []
-            });
-        }
+        const pattern = `%${query.replace(/[=%_]/g, character => `=${character}`)}%`;
+        const [products] = await pool.query(
+            `SELECT id, name, category, price, stock, prescription_required
+             FROM products
+             WHERE is_active = TRUE
+               AND (name LIKE ? ESCAPE '=' OR category LIKE ? ESCAPE '=')
+             ORDER BY name
+             LIMIT 5`,
+            [pattern, pattern]
+        );
+        res.json({
+            success: true,
+            message: products.length
+                ? "Catalog matches only. This search does not diagnose symptoms or recommend treatment. Ask a qualified healthcare professional for medical advice."
+                : "No products matched that name or category. Search the catalog or contact a qualified healthcare professional for medical advice.",
+            products
+        });
     } catch (err) {
-        console.error("AI recommend failed:", err);
-        res.status(500).send({ message: "Server error generating AI recommendation." });
+        console.error("Catalog product search failed:", err);
+        res.status(500).json({ success: false, message: "Server error searching the product catalog." });
     }
 });
 
@@ -2133,17 +2609,25 @@ app.post("/api/user/:id/cart", authenticateToken, async (req, res) => {
 
 // Monthly Medicine Subscription
 app.post("/api/subscriptions", authenticateToken, async (req, res) => {
-    try {
-        const { cartItems } = req.body;
-        // Mocking subscription storage - in production we'd have a `subscriptions` table
-        res.json({ success: true, message: "Monthly refill subscription activated for " + cartItems.length + " items!" });
-    } catch (err) {
-        res.status(500).send({ message: "Server error starting subscription." });
-    }
+    res.status(410).json({
+        success: false,
+        message: "Monthly refill subscriptions are disabled until billing and renewal rules are configured."
+    });
 });
 
 // Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+initDB().then(() => {
+    server.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}).catch(async () => {
+    if (pool) {
+        try {
+            await pool.end();
+        } catch (err) {
+            console.error("Failed to close database pool after initialization failure:", err);
+        }
+    }
+    process.exitCode = 1;
 });
